@@ -1,0 +1,37 @@
+// numen-pathing：寻路模块。设计稿见上游 docs/pathing.md。
+//
+// 边界照上游：这一层**只对着原版 Minecraft 编译**，classpath 上没有 ai / agent / lua / core。
+// 往 Numen 伸手的 import 在编译期就过不去 —— 边界由编译器守，不靠自觉。
+// Numen 经端口接入（见 `api/Ports.java` 与 `body/Body.java`），适配层写在 core 里。
+//
+// 与上游的差别只有两处，都是版本事实：
+//   1. 上游用 `org.spongepowered.gradle.vanilla`（neoForm）对着原版编译；
+//      本仓统一用 fabric-loom + 官方 Mojang 映射，与 core 同一套命名，源码里的类名一一对应。
+//   2. 上游的编译类路径上有 slf4j（1.21.1 自带）；**1.16.5 没有 slf4j**（1.17+ 才有），
+//      所以这里显式 compileOnly 一份，运行期由 core 内嵌的那份提供。
+plugins {
+    id 'fabric-loom' version '0.12.5'
+}
+
+base {
+    archivesName = "${mod_name}-pathing-${minecraft_version}"
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+
+    // fastutil 是 1.16.5 自带的库，loom 会随 minecraft 一起放进编译类路径，不用写。
+    // slf4j 不是：1.16.5 的类路径上完全没有它。只编译用，运行期由 core 内嵌。
+    compileOnly 'org.slf4j:slf4j-api:1.7.36'
+}

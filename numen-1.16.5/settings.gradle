@@ -1,0 +1,48 @@
+// Numen 1.16.5 移植版 —— 单一构建，四个模块。
+//
+// 分层照抄上游：ai（LLM 连接层）与 agent（大脑内核）是纯 JVM、与 MC 版本无关，
+// lua（自研 Lua 5.2 沙箱）同样纯 JVM；core 是 1.16.5 这一侧的模组本体。
+pluginManagement {
+    repositories {
+        // 镜像优先。理由见 README 的「构建」一节：部分网络下 maven.fabricmc.net
+        // （Cloudflare）不可达，而 BMCLAPI 会 302 到 USTC。如果你的网络能直连
+        // Fabric 官方仓，把下面几条对调即可，行为完全一致。
+        // AliyunPublic 排最前：loom 的公共传递依赖（asm/guava/jackson……）量最大，
+        // 让本地镜像整包接住，Cloudflare 那边只留 fabric 独有的几个坐标。
+        maven {
+            name = 'AliyunPublic'
+            url = uri('https://maven.aliyun.com/repository/public')
+        }
+        maven {
+            name = 'BMCLAPI'
+            url = uri('https://bmclapi2.bangbang93.com/maven')
+        }
+        maven {
+            name = 'Fabric'
+            url = uri('https://maven.fabricmc.net')
+        }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'Numen'
+
+// 纯 JVM 三兄弟：不含任何 net.minecraft 引用，逐字照搬上游。
+include('lua')
+include('agent')
+include('ai')
+
+// 寻路模块。它**只对着原版 Minecraft 编译**，classpath 上没有 ai/agent/lua/core ——
+// 边界由编译器守。
+//
+// 2026-10-10：55 条编译错误已全部修完，`:pathing:build` 绿，所以这行**放开了**。
+// 放开之前担心的「Loom 会把同构建里所有 Loom 子项目当嵌套模组收进 jar」**实测不成立**：
+// 只有 core/build.gradle 里显式 `include project(':xxx')` 的那几个（agent/ai/lua + 两个库）
+// 才会进 META-INF/jars，pathing 不在其中（它没有 fabric.mod.json，Loom 只打了一行
+// "Could not find fabric.mod.json" 的提醒就把它的 jar 放过了）。所以留着这行是净收益：
+// `:core:build` 会连带编译 pathing，pathing 一旦被改坏当场就能发现。
+include('pathing')
+
+// 模组本体。
+include('core')

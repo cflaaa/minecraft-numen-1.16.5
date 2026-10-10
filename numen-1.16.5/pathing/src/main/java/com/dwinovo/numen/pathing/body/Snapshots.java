@@ -1,0 +1,121 @@
+package com.dwinovo.numen.pathing.body;
+
+import java.util.List;
+
+import com.dwinovo.numen.pathing.plan.BodySnapshot;
+import com.dwinovo.numen.pathing.plan.Breath;
+import com.dwinovo.numen.pathing.world.BodyStats;
+
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.effect.MobEffect;
+import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffectUtil;
+import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.Pose;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.enchantment.EnchantmentHelper;
+import net.minecraft.world.item.enchantment.Enchantments;
+
+/**
+ * 从一具真实的身体上抄下规划要的身体快照,原版口径只此一处:尺寸取原版的姿势尺寸,迈步取迈步高度,起跳、重力、交互距离见
+ * {@link BodyCompat};这一代的原版没有摔落、水下移动、挖掘速度的属性,摔落的安全高度按跳跃提升效果算,水下移动按深海探索者附魔算,
+ * 挖掘速度的水下系数按水下速掘附魔算。冰霜行者看靴子的附魔,游戏模式、血量、饱食度、
+ * 主背包照抄;氧气、水下呼吸附魔、水下呼吸类效果还剩几刻、头上是不是海龟壳照抄,原版永远不扣氧
+ * 的(能在水下呼吸、无敌)记成效果无穷。
+ *
+ * <p>只在世界所在的线程上调用;抄出来的快照可以交给搜索线程。
+ *
+ * <p><b>1.16.5 的四处写法差别(都是"字段 vs 方法"这一类):</b>
+ * <ul>
+ *   <li>{@code Player.inventory} 是公开字段,没有 {@code.inventory}(1.17+ 才有);</li>
+ *   <li>{@code Player.abilities} 是公开字段,没有 {@code.abilities};</li>
+ *   <li>{@code Entity.maxUpStep} 是公开字段,没有 {@code.maxUpStep};</li>
+ *   <li>细雪(1.17+)不存在,{@code BodyStats} 的"细雪托不托得住"恒为 {@code false}。</li>
+ * </ul>
+ */
+public final class Snapshots {
+
+    private Snapshots() {}
+
+    public static BodySnapshot of(ServerPlayer body) {
+        BodyStats stats = stats(body);
+        // 这一代没有挖掘效率、方块破坏速度属性:效率只来自工具自己的效率附魔(DigTime 按工具算),破坏速度恒为 1
+        BodySnapshot.Mining mining = new BodySnapshot.Mining(0, 1.0,
+                EnchantmentHelper.hasAquaAffinity(body) ? 1.0 : 0.2,
+                MobEffectUtil.hasDigSpeed(body) ? MobEffectUtil.getDigSpeedAmplification(body) : -1,
+                body.hasEffect(MobEffects.DIG_SLOWDOWN) ? body.getEffect(MobEffects.DIG_SLOWDOWN).getAmplifier() : -1);
+        List<ItemStack> inventory = List.copyOf(body.inventory.items);
+        MobEffectInstance jump = body.getEffect(MobEffects.JUMP);
+        return new BodySnapshot(stats, body.gameMode.getGameModeForPlayer(), body.getHealth(),
+                3.0 + (jump == null ? 0 : jump.getAmplifier() + 1),
+                1.0, body.getFoodData().getFoodLevel(),
+                Math.min(3, EnchantmentHelper.getDepthStrider(body)) / 3.0, inventory, mining, breath(body));
+    }
+
+    /**
+     * 憋气的本钱。水下呼吸类效果照原版 {@code MobEffectUtil.hasWaterBreathing} 认水下呼吸与潮涌能量两种,取剩得久的;
+     * 能在水下呼吸的实体({@code canBreatheUnderwater})与无敌的玩家原版不扣氧({@code LivingEntity.baseTick}),记成无穷。
+     */
+    private static Breath breath(ServerPlayer body) {
+        double shield = body.canBreatheUnderwater() || body.abilities.invulnerable ? Double.POSITIVE_INFINITY
+                : Math.max(remaining(body, MobEffects.WATER_BREATHING), remaining(body, MobEffects.CONDUIT_POWER));
+        return new Breath(body.getAirSupply(), body.getMaxAirSupply(), EnchantmentHelper.getRespiration(body),
+                shield, body.getItemBySlot(EquipmentSlot.HEAD).getItem() == Items.TURTLE_HELMET);
+    }
+
+    /** 这个效果还剩几刻;没有为 0,不限时为无穷。 */
+    private static double remaining(ServerPlayer body, MobEffect effect) {
+        MobEffectInstance instance = body.getEffect(effect);
+        if (instance == null) {
+            return 0;
+        }
+        // ⚠️ 语义降级（无替代 API）：1.20 这里问的是 isInfiniteDuration()，1.16.5 的对应物是
+        // isNoCounter()，但 **isNoCounter 与 setNoCounter 在专用服务端的 jar 里被整个裁掉了**
+        // （合并 jar 里有，编译期看不出来），调了就是 NoSuchMethodError。
+        // 只能退回按剩余刻数算：信标/潮涌那类「不倒计时」的效果会报成一个很大的有限值而不是无穷。
+        // 对「还能憋多久气」这个用途，差别只在这一条边界上。
+        return instance.getDuration();
+    }
+
+    /** 第 0 层要的那几项物理量:尺寸、眼高、迈步、起跳、重力、交互距离、细雪与冰霜行者。 */
+    public static BodyStats stats(ServerPlayer body) {
+        return new BodyStats(body.getDimensions(Pose.STANDING), body.getDimensions(Pose.CROUCHING),
+                eyeHeight(Pose.STANDING), eyeHeight(Pose.CROUCHING),
+                body.maxUpStep, BodyCompat.JUMP_STRENGTH, BodyCompat.gravity(body),
+                BodyCompat.blockReach(body), false, frostWalker(body));
+    }
+
+    /**
+     * 一个姿势下眼睛离脚底多高。
+     *
+     * <p>⚠️ <b>不能调 {@code body.getEyeHeight(Pose)}</b>：它在 Loom 编译用的**合并 jar 里有**，
+     * 却在**专用服务端的 jar 里被 ProGuard 裁掉了**——编译期看不出来，一到服务端就 NoSuchMethodError。
+     *
+     * <p>而且这条链很深：`getEyeHeight(Pose, EntityDimensions)` 是 **protected**（外面调不到），
+     * `getStandingEyeHeight` **同样被裁**。所以照 {@code Player.getStandingEyeHeight} 的字节码原样内联。
+     * 玩家这几个值原版就是**常数**（实现里根本没读 dims），所以内联不会丢东西。
+     */
+    private static float eyeHeight(Pose pose) {
+        if (pose == Pose.SLEEPING) {
+            return 0.2F;                        // LivingEntity 在这之前先短路
+        }
+        switch (pose) {
+            case SWIMMING:
+            case FALL_FLYING:
+            case SPIN_ATTACK:
+                return 0.4F;
+            case CROUCHING:
+                return 1.27F;
+            default:
+                return 1.62F;                   // STANDING / DYING
+        }
+    }
+
+    /** 脚上的靴子带冰霜行者。 */
+    private static boolean frostWalker(ServerPlayer body) {
+        return EnchantmentHelper.getItemEnchantmentLevel(Enchantments.FROST_WALKER,
+                body.getItemBySlot(EquipmentSlot.FEET)) > 0;
+    }
+}

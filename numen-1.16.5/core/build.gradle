@@ -1,0 +1,104 @@
+// numen-core：1.16.5 这一侧的模组本体。
+//
+// 与上游 core/fabric 的分工相同：这一层只做「Minecraft 适配」——
+// 把同伴做成一具服务端假玩家、把世界操作包装成工具、把引擎层接到游戏里。
+// 与 MC 版本无关的逻辑一律留在 agent / ai / lua 里，那三个模块是逐字照搬的。
+plugins {
+    id 'fabric-loom' version '0.12.5'
+}
+
+base {
+    archivesName = "${mod_name}-fabric-${minecraft_version}"
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    // 官方 Mojang 映射。与上游同一套命名，源码里类名方法名一一对应。
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_version}"
+
+    // 引擎层。普通 JVM 依赖，同时用 include 打进 jar（jar-in-jar）：
+    // 玩家只装一个文件，就同时拿到引擎。三个模块互为依赖链，
+    // 三个 include 都要写，缺一个会在运行期 NoClassDefFoundError。
+    implementation project(':agent')
+    include project(':agent')
+    include project(':ai')
+    include project(':lua')
+
+    // 寻路模块。它与上面三个不同：**它是对着 Minecraft 编译的**（要读方块、读身体），
+    // 所以不能像它们那样用 include 当嵌套 jar —— 那样发出去的是一个 remapJar 产物，
+    // 里面没有 fabric.mod.json，Loom 自己都会警告 "Could not find fabric.mod.json"。
+    //
+    // 照上游的做法（buildSrc/src/main/groovy/api-loader.gradle 的 jar 任务）**把 class 平铺进本模块的 jar**：
+    // 它对着原版 Mojang 名编译，与 core 同一套命名，随后由 remapJar 连同 core 自己的类
+    // 一起换成 intermediary 名。见下面 tasks.named('jar')。
+    implementation project(':pathing')
+
+    // slf4j 也要随 jar 一起发：**1.16.5 运行期没有 slf4j**（1.17+ 才随
+    // log4j-slf4j-impl 引进游戏），而引擎层 ai/AiLog 与 core/NumenCore 都要用它。
+    // 不这么做的话，进游戏就是 NumenCore.<clinit> 上的 NoClassDefFoundError。
+    //
+    // 只发 slf4j-api 还不够——没有绑定的话它会退化成 NOP logger，
+    // [numen] 的日志会静默消失。log4j-slf4j-impl 把 slf4j 接到游戏自带的 log4j 上，
+    // 日志于是与其它模组一样出现在 latest.log 里。
+    // 版本：2.8.1 与 1.16.5 自带的 log4j 完全一致；它属于 slf4j 1.7 系绑定，
+    // 所以 slf4j-api 用 1.7.36（ai/build.gradle 里也是这个版本）。
+    include 'org.slf4j:slf4j-api:1.7.36'
+    include 'org.apache.logging.log4j:log4j-slf4j-impl:2.8.1'
+}
+
+loom {
+    // 1.16.5 的 Player.DATA_PLAYER_MODE_CUSTOMISATION 是私有的，
+    // 假玩家要点亮皮肤覆盖层必须把它打开。见 numen.accesswidener。
+    accessWidenerPath = file("src/main/resources/numen.accesswidener")
+
+    mixin {
+        // mixins.json 里声明的 refmap 名与 loom 默认按归档名生成的名字对不上，
+        // 运行期按声明的名字读不到，这里显式对齐。上游同样处理。
+        defaultRefmapName = "numen.refmap.json"
+    }
+
+    runs {
+        client {
+            client()
+            setConfigName('Fabric Client 1.16.5')
+            ideConfigGenerated(true)
+            runDir('runs/client')
+        }
+        server {
+            server()
+            setConfigName('Fabric Server 1.16.5')
+            ideConfigGenerated(true)
+            runDir('runs/server')
+        }
+    }
+}
+
+// 寻路模块的类平铺进发行 jar（不是嵌套）。
+//
+// ⚠️ 这三条是**实测出来的**（2026-10-10 踩了六遍，别再改）：
+//   1. `from` 必须是**闭包** `from({ ... })`。配置期求值的直传形式
+//      （`from project(':pathing').sourceSets.main.output`）会被 Loom 自己的 jar 配置
+//      **覆盖掉**——jar 里一个寻路的类都没有；而配置期把 FileCollection 打出来明明是对的。
+//   2. `dependsOn` 必须是**字符串** `':pathing:classes'`（惰性）。写成
+//      `tasks.named('classes')` 会在配置期解析任务对象，报 "Task not found"。
+//   3. **不要**加 `evaluationDependsOn`、也不要加 `inputs.files`——配置期一碰
+//      `project(':pathing')` 就会干扰 Loom，连干净构建都会坏（实测 jar 变 0 个）。
+//
+// ⚠️ 已知残留问题：`:core:jar` 在增量构建下可能被判 UP-TO-DATE 而跳过，
+//    那时发行 jar 里**寻路的类会全部消失**（干净构建则正常，极具迷惑性）。
+//    **改完 pathing 之后务必 clean 构建，并数一数 jar 里的类。**
+tasks.named('jar', Jar) {
+    dependsOn ':pathing:classes'
+    from({ project(':pathing').sourceSets.main.output })
+}

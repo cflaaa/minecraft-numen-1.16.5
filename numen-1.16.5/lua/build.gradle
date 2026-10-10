@@ -1,0 +1,28 @@
+// numen-lua：沙箱里的 Lua 5.2，纯 JVM。
+//
+// 上游自研的 Lua 虚拟机，源码里没有一处 net.minecraft 引用 —— 逐字照搬即可，
+// 移植时一个字都不用改。详见 lua/README.md（随源码一起搬过来了）。
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
+dependencies {
+    // 上游带来的 JUnit 5 测试一并保留，它们不依赖 Minecraft，能独立跑。
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

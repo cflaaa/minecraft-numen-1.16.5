@@ -1,0 +1,52 @@
+// numen-ai：LLM 连接层（OpenAI / Anthropic / DeepSeek / Moonshot / Responses 协议）。
+//
+// 纯 JVM，零 net.minecraft 引用。上游用 java.net.http.HttpClient（JDK 11+）与 Gson，
+// 两者在 1.16.5 这一侧要分开看：
+//   * java.net.http  —— 随 JDK 提供，只要运行期是 Java 11+（本移植要求 17）。没问题。
+//   * Gson           —— Minecraft 1.16.5 自带，但版本是 **2.8.0**（上游那边是 2.10.x），
+//                       源码里 24 处用了 2.8.6+ 才有的 API，已在源码侧改成两代通用的写法。
+//   * slf4j          —— **1.16.5 运行期没有**（1.17+ 才有），由 core 打进发行 jar。
+// 细节见 docs/PORTING.md 的 3.3 / 3.4 两节。
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
+dependencies {
+    // Gson：Minecraft 运行期自带，所以不需要打进 jar —— 但必须是 api 而不是 compileOnly：
+    // Gson 类型（JsonObject / JsonArray / JsonElement）出现在 agent 的公开签名与实现里，
+    // 只写 compileOnly 的话 agent 编译期看不见它们（上游正是用 api，见 ref 的 ai/build.gradle）。
+    //
+    // 版本刻意对齐运行期：1.16.5 自带的是 gson 2.8.0，就按 2.8.0 编译。
+    // 这样一旦用了 2.8.0 之后才新增的 API（例如静态 JsonParser.parseString，2.8.6 才有），
+    // 编译器会当场报错，而不是等到游戏里跑出 NoSuchMethodError。
+    api 'com.google.code.gson:gson:2.8.0'
+
+    // slf4j：与 gson 恰好相反，**1.16.5 运行期没有它**（1.17+ 才随 log4j-slf4j-impl 引入）。
+    // 所以它必须由 core 打进发行 jar，见 core/build.gradle 里的两个 include。
+    // 这里用 1.7.x —— 与内嵌的 log4j-slf4j-impl 2.8.1 是同一代绑定。
+    api 'org.slf4j:slf4j-api:1.7.36'
+
+    // 单元测试要真跑起来：测试类路径上把 gson 抬到 2.10.1（Gradle 冲突解析取高版本），
+    // 于是测试可以自由使用新 API，而 main 源码仍被 2.8.0 卡住。
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+    testImplementation 'org.slf4j:slf4j-api:2.0.9'
+    testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.9'
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

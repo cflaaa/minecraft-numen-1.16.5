@@ -1,0 +1,38 @@
+// numen-agent：大脑内核（ReAct 循环 + 事件队列），纯 JVM。
+//
+// 同样零 net.minecraft 引用，逐字照搬。它消费 ai 的 provider 类型
+// （LlmToolCall / IToolSpec / AssistantTurn），所以对 ai 是 api 而不是 implementation：
+// 这些类型出现在 agent 的公开签名里，core 编译期必须看得见。
+plugins {
+    id 'java-library'
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+}
+
+dependencies {
+    api project(':ai')
+    // 脚本语言是 Lua，跑在本仓自研的沙箱里（numen-lua）。只在 agent.script.lua 用，
+    // 对外的类型里不出现它，所以是 implementation —— 与上游一致。
+    implementation project(':lua')
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+    // 单测可以自由使用新版 gson API：测试类路径上把 gson 抬到 2.10.1
+    // （Gradle 冲突解析取高版本），而 main 源码仍按运行期的 2.8.0 编译。
+    // 与 ai/build.gradle 里的同一处理配套 —— 那边管 ai 自己的测试，这边管 agent 的。
+    testImplementation 'com.google.code.gson:gson:2.10.1'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
