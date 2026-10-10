@@ -18,6 +18,28 @@
 **改代码时守住这条线**：任何与 MC 版本无关的逻辑都不要写进 `core/`，
 这样 `ai`/`agent`/`lua` 才能继续逐字同步上游。
 
+### ★ 版本控制：本仓已建 git 仓库（用户 2026-10-10 要求）
+
+**「之后遇到这种情况使用 git 回退」** —— 改动大、要撤回时，**优先用 git**，不要靠手工删文件。
+
+- 仓库根：`C:/Users/cfl/workbuddy-ai/我的世界/`（工作区根，不是 `numen-1.16.5/`）
+- 初始提交：`12d6176`（360 个文件）
+- 身份是**仓库级**配置（`user.name=cfl` / `user.email=cfl@localhost`），没动全局
+- **忽略**：`.toolchain/`（742M JDK+Gradle）、`.testserver/`（88M 测试服）、`ref/`（上游克隆，
+  它自己就是仓库，不能嵌套）、`**/build/`、`logs/`、`__pycache__/` 等
+
+**常用回退**：
+```bash
+git status                       # 看改了什么
+git checkout -- <路径>            # 撤单个文件的改动
+git restore --staged <路径>       # 取消暂存
+git reset --hard HEAD            # 撤掉所有未提交改动（⚠️ 不可恢复）
+git revert <commit>              # 已提交的改动做一次反向提交（推荐，可追溯）
+```
+
+⚠️ **提交前先 `git status` 确认没有把大文件带进来**（构建产物已在忽略表里，但新目录要留意）。
+⚠️ `.workbuddy-ai/` 也在版本库里（我的项目笔记），这是有意的。
+
 ### 硬约束
 
 1. **本机能构建了**（2026-10-09 实测打通）。要点：`maven.fabricmc.net` 是**抖动**不是被墙，
