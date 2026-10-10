@@ -57,6 +57,20 @@ public final class NumenPlayer extends ServerPlayer implements Body {
      */
     private PlayerHands hands;
 
+    /**
+     * 挂在这具身体上的同伴级状态,按类型各一份(征询登记处、等主人答复的调用之类)。
+     *
+     * <p>与上游同一原则——<b>跟着身体走,不进静态表</b>:身体没了状态就没了,休眠回来是新身体、
+     * 新状态,不用给每一种状态各配一套离场清理;引擎不认识调用方的类型,所以按类型取、
+     * 首次取时由调用方建。（照上游 {@code entity/NumenPlayer#state} 逐字搬，2026-10-11 权限层归位。）
+     */
+    private final java.util.Map<Class<?>, Object> bodyState = new java.util.HashMap<>();
+
+    /** 取(首次取时建)这具身体上的一份同伴级状态。 */
+    public <T> T state(Class<T> type, java.util.function.Supplier<T> init) {
+        return type.cast(bodyState.computeIfAbsent(type, k -> init.get()));
+    }
+
     public NumenPlayer(MinecraftServer server, ServerLevel level, GameProfile profile) {
         // 1.16.5：四参。见类注释。
         super(server, level, profile, new ServerPlayerGameMode(level));
@@ -231,6 +245,15 @@ public final class NumenPlayer extends ServerPlayer implements Body {
         // 原版由客户端与网络层替真玩家做的这一趟，由 {@link Physics#step} 在这里补上，每刻一次。
         try {
             Physics.step(this);
+        } catch (RuntimeException ex) {
+            reportTickFailure(ex);
+        }
+
+        // 征询登记处的每刻检查（主人下线/到点按拒绝收尾）。上游挂在 CompanionTickDispatcher
+        // （任务调度内核，阶段 2 归位）里每刻对所有在场同伴调一遍；在那之前先跟着身体的 tick 走，
+        // 反正登记处本身也挂在身体上（state），同一原则：跟着身体走，不进静态表。
+        try {
+            com.dwinovo.numen.core.permission.ConsentDesk.of(this).tick();
         } catch (RuntimeException ex) {
             reportTickFailure(ex);
         }

@@ -48,3 +48,10 @@ desktop.ini
 *.orig
 *.rej
 *~
+
+# ---- 工作区临时目录（调试产物、一次性脚本，别入库）----
+.workbuddy-ai/tmp/
+
+# ---- 含明文密码的脚本：SSH 到 NAS 用的 paramiko 脚本（密码在文件里），
+#      一旦入库就进了 git 历史，删也删不干净。本机自己用。----
+ssh-run.py

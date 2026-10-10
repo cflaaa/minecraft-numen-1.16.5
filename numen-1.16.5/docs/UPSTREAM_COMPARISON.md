@@ -1,0 +1,126 @@
+# 对比原版 mod（1.20.1）改动检查报告
+
+- **生成日期**：2026-10-10
+- **对比基线**：原版 = `ref/numen-1.20.1`（同作者 `com.dwinovo.numen` 的 1.20.1 版）；本仓 = git HEAD `eb6965d`（"新规则前"的状态）
+- **性质**：**仅检查，未改动任何文件**（生成本报告时 git 工作树干净）
+
+---
+
+## 1. 总体结构对照
+
+| 层 | 原版规模 | 本仓现状 | 性质 |
+|---|---|---|---|
+| engine：`lua` / `agent` / `ai` | 逐字照搬 | 逐字搬，465 单测通过 | ✅ 一致 |
+| `pathing` | 117 文件 | 117 文件移植，真机跑通 | ✅ 一致 |
+| `core` 本体 | — | 36 个 java 文件 | 部分自写 |
+| `task/` 框架 | 20 文件 | **5 文件** + `act/Acts.java`(1) | 子集自写 |
+| `sdk/` | 40+ 文件 | **0**（未搬） | 缺口 |
+| `program/` | 24 文件 | **0**（判定不需要） | 缺口 |
+| `script/` | 3 文件（Modules 524 行等） | `CompanionScript.java`(1, 307 行) | 自写替代 |
+| `agent/tool/` | 13 文件 | `NumenTools.java` 扁平表 | 自写替代 |
+| `permission/` | 17 文件 | **0**（曾搬，已回退） | 缺口 |
+| `api/gear/` | 2 文件 | **0**（未搬） | 缺口 |
+
+---
+
+## 2. 改动清单（按"为什么不用原版"分类）
+
+### A. 能力子集自写 —— 进度性，非版本、非创新
+
+**① `core/task/act/Acts.java`** 替代原版 `core/task/interact/`(4) + `core/task/inventory/`(12) + `core/tools/interact/`(3) + `core/tools/inventory/`(4) 中"当前能落地的能力"。
+
+- 原版这些任务长在 `AbstractCompanionTask`(637 行) + 导航 + 权限层 + SDK 上，**依赖闭包 >12000 行**；本仓只落地 5 个原子能力：`useBlock` / `bag` / `equip` / `eat` / `drop`。
+- 具体差异（已写在文件注释里）：
+  - `eat` 直接调 `ItemStack.finishUsingItem`，**跳过举起/咀嚼多刻**；
+  - `equip` 直写 `inventory.setItem`，**不调原版 `Wardrobe.wear`**（属未搬的 `core/gear`），但穿的是同一槽，原版读到的装备状态仍正确；
+  - `useBlock` 走 `body.hands().use`（原版服务端收右键包那条路），行为一致。
+- **原因**：依赖闭包太大，先落地能力。待 TaskRecord / 权限 / SDK 补齐后需回头对齐上游写法。
+
+**② `core/agent/NumenTools.java`** 替代原版 `agent/tool/`(13) + `sdk/`(40+) + `core/tools/*Api.java`。
+
+- 原版用 `@Fn` 注解静态方法 + `Binder` 位置绑定 + `Dispatcher` + `LuaCodecs` + `ServerCall` 编译成 API 注册表，再由 `program/` 传输层送服务端。
+- 本仓用一份扁平 `SPECS` 表（12 工具：say / get_status / inspect_block / scan_blocks / goto / mine / use_block / inventory / equip / eat / drop / lua）+ 极简 `Job` 串行执行器（UUID→正在跑的活，跨刻的 goto 交 `CompanionNav.tick`）。
+- **原因**：sdk + program 两层约 64 文件尚未移植；扁平表是"召唤→说话→走→挖→报"最小实现。进度约束，非版本。
+
+**③ `core/script/CompanionScript.java`** 替代原版 `script/`(3) + sdk 绑定层。
+
+- 原版：Lua 模块从磁盘 `config/numen/lua/<主人>/` 加载，含安装/升级/账本/战绩/指纹全套；函数经 `ApiFunction` / `Binder` 位置绑定。
+- 本仓：内存 `register(...)` 直接挂 Java 函数，5 个内置函数（`numen.inv.items` / `inv.eat` / `inv.drop` / `gear.hold` / `use.block`）；参数**只走选项表**；**无 JOB**（不能调跨刻动作，调了当场失败）；无磁盘模块、无战绩统计。
+
+### B. 导航/网络薄壳自写（底层用已移植的 pathing）
+
+**④ `core/nav/CompanionNav.java`**（替代原版 `core/task/nav/Trip` + `Journey` 导航任务，只是 pathing 的薄适配器）与 **`core/nav/CompanionPorts.java`**（替代原版 `nav` + `combat/Menace` 的端口/选区）。底层 A* 已随 pathing 移植，这两件是壳。
+
+### C. 版本约束允许偏差（非创新）
+
+**⑤ G 面板自绘**：`client/NumenPanelScreen` + `NumenField` + `NumenUi`。原版用原版 `Button` / `EditBox`，跨版本渲染同步不上；自绘反而稳。已记入 MEMORY.md 为"版本原因允许"。
+**⑥ `llm/ModelCatalog`(+`State`)**：LLM 模型目录，用户明确要求加的（用户请求），非创新。
+
+### D. 原版有、本仓缺口（非版本原因，需按"对标原版不许结构删减"规则回补）
+
+> 这些目前是**未移植**，不是"主动删减"——但与"对标原版不许结构删减"的规则冲突，需排期归位。
+
+1. **`sdk/`**（40+ 文件，`@Fn` API 函数框架）—— 未搬。
+2. **`permission/`**（17 文件，同意/权限层）—— 曾搬、已回退，待归位。
+3. **`api/gear/`**（2 文件，Wardrobe 穿脱）—— 未搬（`Acts.equip` 暂直写槽位顶替）。
+4. **`task/` 框架缺 15 个文件**：`BrainChains` / `CompanionTickDispatcher` / `HandPinRelease` / `Preparing` / `TaskApi` / `TaskDispatch` / `TaskFactory` / `TaskPersistence` / `TaskRecord` / `TaskSessionHooks` / `TaskSlot` / `TimerRegistry` / `UnsupportedTask` / `chain/` / `reflex/`。
+5. **其余任务族**（build / combat / dig / fish / locate / move / reflex / survival / wait / chain / perception / time 等 13 族，约 63 文件）—— 均未搬。
+
+注：`TaskResult.java` 是**唯一一处逐字删改**（去掉了 `stoppedBy(TaskRecord.StopCause)` 方法，因为它引用未搬的 `TaskRecord`），其余 4 个框架文件为逐字搬。
+
+---
+
+## 3. 影响分析（对其他功能）
+
+- **`Acts.java`**：只影响 interact / inventory 这一小撮能力本身，不动 engine / pathing / panel / mcp。`eat` 跳过咀嚼、`equip` 绕过 `Wardrobe` 这两处与原版细节不同；若日后要接 TaskRecord 的"谁改了装备"审计，需回头对齐。
+- **`NumenTools` 扁平表**：决定"模型能做什么"的暴露面。原版 44 个 `@Fn` API 函数目前只暴露 12 工具子集，且**没有** sdk 的类型化返回值（原版 `Job<R>` / `Pending<R>` 在脚本里按 R 写值）。MCP 路（`McpActuator#invoke`）靠 `resolve(name)` 按名查，与原版一致。
+- **`CompanionScript` 无 JOB**：脚本里调不了跨刻动作（goto / 走到 / 挖到碎）。原版 `numen.work.collect` 这类多步任务目前跑不了——影响"脚本上限"，但不影响已暴露的 5 个同步函数。
+- **⚠️ 脚本限流缺口**：`lua` 工具描述里写着"400 次调用与两分钟墙钟上限"，但 `CompanionScript.run`(119–141 行) 的 `while` 循环**没有任何计数器/时钟保护**，原版 `ProgramLimits` 的安全限流并未落地。建议回补或在 `run` 里强制。
+- **`permission` 未搬**：目前**任何动作都不经过同意层**——原版 `Gate` / `RuleSet` 对"破坏/放置方块"的拦截在本仓是敞开的。这是 revert 后留下的最大行为缺口，归位前同伴会无差别执行挖/放/用。
+- **G 面板 / ModelCatalog**：仅影响客户端 UI 与模型选择，不影响游戏逻辑；属版本/用户原因允许的偏差。
+
+---
+
+## 4. 结论
+
+- **真正"自写替代原版"且非版本原因**的只有 4 处：`Acts.java`、`NumenTools.java`、`CompanionScript.java`、`CompanionNav` / `CompanionPorts`。
+- 前 3 处是**进度性自写**（依赖闭包太大，先用更薄的等价物顶上），功能覆盖是**子集而非重构**，不属"创新"也不属"结构删减"。
+- **版本允许偏差** 2 处：G 面板自绘、`ModelCatalog`。
+- **真正属"原版有、本仓缺口、需按规则回补"** 的见第 2 节 D 项（sdk、permission、api/gear、task 框架 15 文件、其余 13 个任务族）。
+- 两处需在回补时一并修正的隐患：`TaskResult.stoppedBy` 待 `TaskRecord` 归位时补回；`CompanionScript` 的脚本限流待落地。
+
+---
+
+## 附录：给非技术读者的答疑
+
+### A-1. "依赖闭包 >12000 行"是什么？开源还是闭源？要适配 1.16.5 吗？适合移植吗？
+
+- **闭包（依赖闭包）**：指"要想让那几件小功能（开箱子、吃东西、穿装备）真正按原版方式跑起来，必须一并搬过来的所有上游代码"——它不只是那几个文件，还拖着一整条公共底座（任务基类、自动寻路、同意/权限、API 框架），全部加起来超过 12000 行。
+- **开源还是闭源**：**开源**。原版和本仓是同一个作者（dwinovo）的同一个 mod（Numen / 言出法随），`ref/numen-1.20.1` 就是它的源代码克隆，全部可读可搬。
+- **要适配 1.16.5 吗**：**要**。原版跑在 1.20.1 上，它调用的很多 Minecraft 内部接口在 1.16.5 里名字、位置甚至有没有都不一样，搬过来时几乎每一处都要对照官方映射改一遍（这正是 PORTING.md 里记录的主要工作量）。
+- **适合移植吗**：**适合，而且是计划内的**。它和本仓是同根，逻辑上能逐层搬。之所以先写"子集"而不是一次搬全，只是因为 12000 行的底座太大、且互相套娃，先把"能用"的能力做出来，底座补齐后再换回原版写法（见 A-2）。
+
+### A-2. "回头对齐上游写法"是什么意思？未来还能回归原版移植方案吗？
+
+**能，而且这就是计划。** 现在 `Acts.java` 是我们为了"尽快让能力跑起来"写的简化版（5 个动作，直来直去）。等上游那套底座——`TaskRecord`（任务记录）、权限层、SDK——被搬过来之后，我们会把 `Acts.java` 改写成和原版一样的结构（用原版那套"任务类 + 记录 + 权限"的写法），让本仓和原版在代码层面重新对齐。**所以现在走的"子集"是临时跳板，不是终点；最终仍回到原版移植方案。**
+
+### A-3. 用大白话解释第 2、第 3 点（NumenTools / CompanionScript）
+
+- **第 2 点（工具表 `NumenTools`）＝"AI 能对这个世界做什么"的清单。**
+  上游做了一张很完整、很讲究的清单：44 种动作，还配了一整套复杂的"接线 + 传输"系统把动作送进游戏。我们暂时做成了一张**简单的清单：12 种动作**（说话、看状态、看方块、扫一圈、走过去、挖一格、用方块、看背包、穿、吃、丢、跑脚本）。**能用，但只是上游的缩小版**——等上游那套复杂系统搬过来，我们再换成原版的完整版。
+
+- **第 3 点（脚本 `CompanionScript`）＝"让 AI 写一小段程序，一次做完很多步"。**
+  比如 AI 想"先翻背包、找到面包、吃掉、再报告"，与其分四次调工具，不如写一段小程序一次跑完。上游的做法是：这些程序**存在硬盘文件里**，还有一套"安装 / 升级 / 记账 / 统计"的管理系统；函数通过一套绑定机制接到游戏。我们暂时把程序**放在内存里**，只提供 5 个最常用的内置命令，而且**不能写需要跨好几秒才能完成的动作**（比如"走过去"这种）。这也是因为上游那套"硬盘模块管理 + 绑定系统"还没搬。
+
+### B. "导航/网络薄壳自写"是什么意思？重写自动寻路了吗？
+
+**没有重写自动寻路。** 真正的自动寻路（绕开障碍、上下台阶、找路的 A* 算法）**早就作为 `pathing` 模块从原版搬过来了**（117 个文件，真机验证能跑）。
+
+所谓的"薄壳"（`CompanionNav`）只是一小段**连接件**：它把"已经能用的寻路"接到同伴身上——每个游戏刻告诉同伴"朝目标再走一步"，走完了回报一声。它本身不含寻路算法，只是"调用已搬好的寻路"。
+
+（`CompanionPorts` 同理，是把原版"选目标 / 端口"那部分接过来的一小层壳。）
+
+### C. 关于 G 面板自绘 与 `ModelCatalog`（用户偏好）
+
+- 这两处目前是"自写/自加"而非搬原版，属于被允许的偏差（G 面板因跨版本渲染、ModelCatalog 因用户要求）。
+- **用户偏好**：可以允许，但**如果可能，更希望先移植原版版本**，而不是长期保留自写版。已记录此偏好，后续归位时优先用原版替换。

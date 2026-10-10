@@ -161,7 +161,8 @@ public final class NumenTools {
                             + "能调的：numen.inv.items() / numen.inv.eat{item=} / numen.inv.drop{item=,count=} / "
                             + "numen.gear.hold{item=} / numen.use.block{x=,y=,z=}。"
                             + "用 print(...) 报告你看到的东西；用 return 交回一个值。"
-                            + "程序是同步跑完的（不能等跨刻的动作），有 400 次调用与两分钟的墙钟上限。",
+                            + "程序是同步跑完的（不能等跨刻的动作），有 200 次调用与二十分钟的墙钟上限"
+                            + "（上限由引擎的 ScriptLimits 强制）。",
                     obj("type", "object",
                             "properties", obj(
                                     "code", obj("type", "string", "description", "Lua 程序正文")),

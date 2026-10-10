@@ -205,7 +205,14 @@ def main():
     for cmd in ("/numen list",
                 "/execute as %s run numen summon %s" % (PLAYER, COMPANION),
                 "/numen list",
-                "/numen status %s" % COMPANION):
+                "/numen status %s" % COMPANION,
+                # 归位阶段 1：权限层命令树（permission/ 17 个类 + Gate/RuleSet 落地后的接口）
+                "/execute as %s run numen permission mode" % PLAYER,
+                "/execute as %s run numen permission mode owner" % PLAYER,
+                "/execute as %s run numen permission rules list" % PLAYER,
+                "/execute as %s run numen permission rules add deny break(placed & !contents)" % PLAYER,
+                "/execute as %s run numen permission rules list" % PLAYER,
+                "/execute as %s run numen permission rules reset" % PLAYER):
         print("  >>> " + cmd)
         server.stdin.write((cmd + "\n").encode("utf-8"))
         server.stdin.flush()

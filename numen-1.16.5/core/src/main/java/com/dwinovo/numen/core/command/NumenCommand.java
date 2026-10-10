@@ -3,20 +3,34 @@ package com.dwinovo.numen.core.command;
 import com.dwinovo.numen.core.NumenCore;
 import com.dwinovo.numen.core.agent.CompanionBrain;
 import com.dwinovo.numen.core.config.NumenConfig;
+import com.dwinovo.numen.core.data.ModLanguageData;
 import com.dwinovo.numen.core.entity.CompanionFactory;
 import com.dwinovo.numen.core.entity.Companions;
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.dwinovo.numen.core.permission.ConsentAnswer;
+import com.dwinovo.numen.core.permission.ConsentDesk;
+import com.dwinovo.numen.core.permission.Mode;
+import com.dwinovo.numen.core.permission.Permission;
+import com.dwinovo.numen.core.permission.PermissionStore;
+import com.dwinovo.numen.core.permission.Rule;
+import com.dwinovo.numen.core.permission.RuleSet;
+import com.dwinovo.numen.core.permission.Verdict;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.LongArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
@@ -68,7 +82,183 @@ public final class NumenCommand {
                                 .then(Commands.argument("value", StringArgumentType.greedyString())
                                         .executes(ctx -> config(ctx,
                                                 StringArgumentType.getString(ctx, "key"),
-                                                StringArgumentType.getString(ctx, "value")))))));
+                                                StringArgumentType.getString(ctx, "value"))))))
+                // 权限层与征询答复（归位阶段 1 搬入）。命令本体照上游 entity/NumenCommands 的
+                // permission/consent 段落搬；上游挂在 /numen 根下并按 FOR_PLAYERS 过滤，
+                // 本仓的 /numen 根自带 requires(2)，沿用本仓现状（单人即开作弊）。
+                .then(permissionCommand())
+                .then(consentCommand()));
+    }
+
+    // ---- 权限（照上游 NumenCommands 搬，2026-10-11） ----
+
+    /** {@code /numen permission mode <名字> [模式] | rules list|add|remove|reset}。 */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> permissionCommand() {
+        var modeName = Commands.argument("name", StringArgumentType.word()).executes(ctx -> mode(ctx, null));
+        for (Mode mode : Mode.values()) {
+            modeName.then(Commands.literal(mode.name().toLowerCase(Locale.ROOT)).executes(ctx -> mode(ctx, mode)));
+        }
+        return Commands.literal("permission")
+                .then(Commands.literal("mode").then(modeName))
+                .then(Commands.literal("rules")
+                        .then(Commands.literal("list").executes(NumenCommand::listRules))
+                        .then(tableCommand("add", (literal, table) -> literal.then(
+                                Commands.argument("rule", StringArgumentType.greedyString())
+                                        .executes(ctx -> addRule(ctx, table)))))
+                        .then(tableCommand("remove", (literal, table) -> literal.then(
+                                Commands.argument("row", IntegerArgumentType.integer(1))
+                                        .executes(ctx -> removeRule(ctx, table)))))
+                        .then(Commands.literal("reset").executes(NumenCommand::resetRules)));
+    }
+
+    /** {@code <verb> <deny|ask|allow> …}:三张表各一个字面量分支,后面接什么由 {@code branch} 定。 */
+    private interface TableBranch {
+        com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> attach(
+                com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> literal, Verdict.Kind table);
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> tableCommand(
+            String verb, TableBranch branch) {
+        var root = Commands.literal(verb);
+        for (Verdict.Kind table : List.of(Verdict.Kind.DENY, Verdict.Kind.ASK, Verdict.Kind.ALLOW)) {
+            root.then(branch.attach(Commands.literal(tableName(table)), table));
+        }
+        return root;
+    }
+
+    private static String tableName(Verdict.Kind table) {
+        return table.name().toLowerCase(Locale.ROOT);
+    }
+
+    /** 看或设调用者名下一只在场同伴的模式。 */
+    private static int mode(CommandContext<CommandSourceStack> ctx, Mode mode) throws CommandSyntaxException {
+        ServerPlayer owner = ctx.getSource().getPlayerOrException();
+        String name = StringArgumentType.getString(ctx, "name");
+        NumenPlayer companion = null;
+        for (ServerPlayer player : owner.getServer().getPlayerList().getPlayers()) {
+            if (player instanceof NumenPlayer body && body.isOwnedByPlayer(owner.getUUID())
+                    && body.getName().getString().equals(name)) {
+                companion = body;
+            }
+        }
+        if (companion == null) {
+            fail(ctx, new TranslatableComponent(ModLanguageData.Keys.COMMAND_YOURS_NOT_HERE, name));
+            return 0;
+        }
+        if (mode != null) {
+            Permission.setMode(companion, mode);
+        }
+        String now = Permission.modeOf(companion).name().toLowerCase(Locale.ROOT);
+        ctx.getSource().sendSuccess(new TranslatableComponent(
+                mode == null ? ModLanguageData.Keys.COMMAND_MODE : ModLanguageData.Keys.COMMAND_MODE_SET,
+                name, now), false);
+        return 1;
+    }
+
+    private static int listRules(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer owner = ctx.getSource().getPlayerOrException();
+        RuleSet mine = PermissionStore.of(owner.getServer(), owner.getUUID()).rules();
+        MutableComponent text = new TranslatableComponent(ModLanguageData.Keys.COMMAND_RULES_YOURS);
+        appendLayer(text, mine, true);
+        text.append("\n").append(new TranslatableComponent(ModLanguageData.Keys.COMMAND_RULES_FACTORY));
+        appendLayer(text, RuleSet.factory(), false);
+        text.append("\n").append(new TranslatableComponent(ModLanguageData.Keys.COMMAND_RULES_UNMATCHED));
+        ctx.getSource().sendSuccess(text, false);
+        return 1;
+    }
+
+    /** 一层规则的三张表:表名与规则行照命令里的写法,只有"没有"一词随主人的语言。 */
+    private static void appendLayer(MutableComponent text, RuleSet layer, boolean numbered) {
+        for (Verdict.Kind table : List.of(Verdict.Kind.DENY, Verdict.Kind.ALLOW, Verdict.Kind.ASK)) {
+            List<Rule> rows = layer.table(table);
+            text.append("\n  " + tableName(table) + ":");
+            if (rows.isEmpty()) {
+                text.append(" ").append(new TranslatableComponent(ModLanguageData.Keys.COMMAND_RULES_NONE));
+            }
+            for (int i = 0; i < rows.size(); i++) {
+                text.append("\n    " + (numbered ? (i + 1) + ". " : "- ") + rows.get(i));
+            }
+        }
+    }
+
+    /** 主人加一行规则。 */
+    private static int addRule(CommandContext<CommandSourceStack> ctx, Verdict.Kind table)
+            throws CommandSyntaxException {
+        ServerPlayer owner = ctx.getSource().getPlayerOrException();
+        Rule rule;
+        try {
+            rule = Rule.parse(StringArgumentType.getString(ctx, "rule"));
+        } catch (IllegalArgumentException mistake) {
+            fail(ctx, new TextComponent(mistake.getMessage()));
+            return 0;
+        }
+        boolean added = PermissionStore.of(owner.getServer(), owner.getUUID()).add(table, rule);
+        ctx.getSource().sendSuccess(new TranslatableComponent(
+                added ? ModLanguageData.Keys.COMMAND_RULE_ADDED : ModLanguageData.Keys.COMMAND_RULE_EXISTS,
+                tableName(table), rule.toString()), false);
+        return added ? 1 : 0;
+    }
+
+    private static int removeRule(CommandContext<CommandSourceStack> ctx, Verdict.Kind table)
+            throws CommandSyntaxException {
+        ServerPlayer owner = ctx.getSource().getPlayerOrException();
+        PermissionStore store = PermissionStore.of(owner.getServer(), owner.getUUID());
+        int row = IntegerArgumentType.getInteger(ctx, "row");
+        int size = store.rules().table(table).size();
+        if (row > size) {
+            fail(ctx, new TranslatableComponent(ModLanguageData.Keys.COMMAND_RULE_NO_ROW, tableName(table),
+                    row, size));
+            return 0;
+        }
+        Rule removed = store.remove(table, row - 1);
+        ctx.getSource().sendSuccess(new TranslatableComponent(ModLanguageData.Keys.COMMAND_RULE_REMOVED,
+                tableName(table), removed.toString()), false);
+        return 1;
+    }
+
+    private static int resetRules(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer owner = ctx.getSource().getPlayerOrException();
+        PermissionStore.of(owner.getServer(), owner.getUUID()).reset();
+        ctx.getSource().sendSuccess(
+                new TranslatableComponent(ModLanguageData.Keys.COMMAND_RULES_RESET), false);
+        return 1;
+    }
+
+    // ---- 征询答复（照上游 NumenCommands 搬，2026-10-11） ----
+
+    /** {@code /numen consent allow <id> | remember <id> | deny <id> [附言]}。附言只随拒绝。 */
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> consentCommand() {
+        return Commands.literal("consent")
+                .then(Commands.literal("allow").then(consentId(ConsentAnswer.Decision.ALLOW_ONCE)))
+                .then(Commands.literal("remember").then(consentId(ConsentAnswer.Decision.ALLOW_REMEMBER)))
+                .then(Commands.literal("deny").then(consentId(ConsentAnswer.Decision.DENY)
+                        .then(Commands.argument("note", StringArgumentType.greedyString())
+                                .executes(ctx -> consent(ctx, ConsentAnswer.Decision.DENY,
+                                        StringArgumentType.getString(ctx, "note"))))));
+    }
+
+    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, Long> consentId(
+            ConsentAnswer.Decision decision) {
+        return Commands.argument("id", LongArgumentType.longArg(1)).executes(ctx -> consent(ctx, decision, ""));
+    }
+
+    private static int consent(CommandContext<CommandSourceStack> ctx, ConsentAnswer.Decision decision, String note)
+            throws CommandSyntaxException {
+        ServerPlayer owner = ctx.getSource().getPlayerOrException();
+        long id = LongArgumentType.getLong(ctx, "id");
+        NumenPlayer companion = ConsentDesk.pendingAt(owner.getServer(), id);
+        ConsentDesk.Reply reply = companion == null ? ConsentDesk.Reply.NOT_PENDING
+                : ConsentDesk.reply(owner, companion, id, decision, note);
+        switch (reply) {
+            case ANSWERED -> ctx.getSource().sendSuccess(new TranslatableComponent(
+                    ModLanguageData.Keys.COMMAND_CONSENT_ANSWERED,
+                    id, companion.getName(), decision.name().toLowerCase(Locale.ROOT)), false);
+            case NOT_OWNER -> fail(ctx, new TranslatableComponent(
+                    ModLanguageData.Keys.COMMAND_CONSENT_NOT_OWNER, id));
+            case NOT_PENDING -> fail(ctx, new TranslatableComponent(
+                    ModLanguageData.Keys.COMMAND_CONSENT_NOT_PENDING, id));
+        }
+        return reply == ConsentDesk.Reply.ANSWERED ? 1 : 0;
     }
 
     // ---- 各子命令 ----
@@ -206,6 +396,11 @@ public final class NumenCommand {
 
     private static void fail(CommandContext<CommandSourceStack> ctx, String message) {
         ctx.getSource().sendFailure(new TextComponent(message).withStyle(ChatFormatting.RED));
+    }
+
+    /** 同 {@link #fail(CommandContext, String)}，收一条现成的组件（征询/权限命令用上游的语言键）。 */
+    private static void fail(CommandContext<CommandSourceStack> ctx, net.minecraft.network.chat.Component message) {
+        ctx.getSource().sendFailure(message);
     }
 
     /** 给别处引用的：名字规则，召唤前先自己校验一遍省得来回。 */

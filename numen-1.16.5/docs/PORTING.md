@@ -1351,3 +1351,86 @@ api/common/sdk                                4026
 
 `:core:build` 绿，jar 已部署。**游戏内还没测**——下一次要跑的是：
 模型写一段 `numen.inv.items()` + `numen.use.block{...}` 的程序，看回执对不对。
+
+## 十四、归位阶段 1：权限层（permission/ 17 件套）（2026-10-11）
+
+### 14.1 背景与决策
+
+上游有一整套「同伴行为许可」层：同伴每次动手（挖/放/攻击/用方块/命令）都要过
+`Gate`（owner 三层：deny→allow→ask）+ 工厂默认表 + 玩家放过的方块账本
+（`PlacedBlocks`）+ 规则解析器（`Rule`，如 `break(placed & !contents)`），
+不可逆动作还要主人**点头**（`ConsentDesk`）。这是「言出法随」不拆家的安全底座，
+归位计划（docs/RESTORE_PLAN.md）把它列为第一刀。
+
+用户拍板 **A 计划**：大脑留在服务端（现状），`program/` 传输层不搬，
+内置插件 API（sdk/ 等）逐阶段补。本阶段 = permission/ 全量 + 测试。
+
+### 14.2 1.16.5 适配对照表（全部 javap 过 loom 缓存的 merged-named jar）
+
+| 上游 (1.20.1) | 1.16.5 等价物 |
+|---|---|
+| `BuiltInRegistries.BLOCK/ITEM` | `Registry.BLOCK` / `Registry.ITEM`（DefaultedRegistry） |
+| `TagKey` / `Holder` / `state.is(TagKey)` | `SerializationTags.getInstance().getBlocks().getTagOrEmpty(id)` + `block.is(Tag<Block>)` / `item.is(Tag<Item>)` / `entityType.is(Tag<EntityType<?>>)` |
+| `TagCollection.of(...)`/`empty()`/`bind(...)` | 同名 public；`SetTag.create(Set)`；`Tag.Named.getName()`（不是 getLocation） |
+| `state.hasBlockEntity()` | `state.getBlock() instanceof EntityBlock` |
+| `net.minecraft.core.UUIDUtil` | `Codec.STRING.xmap(UUID::fromString, UUID::toString)` |
+| `ChunkPos.asLong(BlockPos)` | `ChunkPos.asLong(x >> 4, z >> 4)` |
+| `OwnableEntity.getOwnerUUID()` | `TamableAnimal.getOwnerUUID()` |
+| `DimensionDataStorage.computeIfAbsent(supplier,id)` | 同签名存在；`SavedData` 抽象 `load(CompoundTag)+save(CompoundTag)`，构造器 `SavedData(String)` |
+| DFU 4.0.26 `DataResult.error(Supplier)` | 只有 `error(String)`；`resultOrPartial(Consumer<String>)` 在 |
+| `Item.getDescription()`（服务端被 ProGuard 裁） | `new ItemStack(item).getHoverName()` |
+| `Component.translatable/literal` | `new TranslatableComponent(...)` / `new TextComponent(...)` |
+| `Entity.level()` | `getLevel()` |
+| `SharedConstants.tryDetectVersion()` | 1.17+ 才有；测试引导只 `Bootstrap.bootStrap()` |
+
+### 14.3 有意的过渡差异（A 计划产物，network/ 落地后换回）
+
+上游把征询请求**推到主人客户端**弹 GUI（ConsentRequestPayload）。本版没有
+network/，改走聊天消息 + 可点击按钮（`ClickEvent.Action.RUN_COMMAND` →
+`/numen consent allow|remember|deny <id>`）。`ConsentDesk.Line` 接缝保持原样，
+换回时只动 `BodyLine`。
+
+`ConsentDesk` 的 tick 上游由 CompanionTickDispatcher 驱动（任务框架，阶段 2），
+现挂在 `NumenPlayer.tick()` 里 try/catch 兜底。
+
+### 14.4 测试（55 条全绿）
+
+上游 api/common 的测试思路搬过来：`FakeWorld`（只实现 BlockGetter 三个抽象方法）
++ `Bootstrap.bootStrap()` 引导注册表；自定义标签注入用
+`TagCollection.of(map)` + `SerializationTags.bind`（**不用** 起 tag loader）。
+JUnit 5：BOM 5.11.4 + `useJUnitPlatform()`。分布：Rule 6 / Gate 16 / ConsentDesk 12
+/ CommandRule 11（Brigadier 迷你树，含 tp/msg 别名）/ PermissionStore 4 / PlacedBlocks 6。
+PermissionStore/PlacedBlocks 测试走静态 `decode(CompoundTag)`（实例 load 与
+SavedData.load 撞名）。
+
+### 14.5 🔴 大坑：remapJar 间歇性丢光 pathing 类（真凶找到了，与测试依赖无关）
+
+现象：`:core:build` 绿，发行 jar 里 pathing 的类 0 个（dev jar 243 个好好的），
+时好时坏，`git stash` 单变量实验还一度把罪名扣到 junit 依赖头上——**冤案**。
+
+真凶：**loom 0.12 默认跨项目共享 TinyRemapperService**。服务 id 只由
+mappings+任务名构成（`remapJarService:named:intermediary:remapJar`），不含项目路径，
+于是 `:core:remapJar` 和 `:pathing:remapJar` 共用同一个 tiny-remapper 实例：
+
+1. core 的发行 jar 平铺了 pathing 的类（jar 任务的 `from` 闭包）；
+2. pathing 的 dev jar 又在 core 的 compileClasspath 上；
+3. 两个 `prepareRemapJar` 并发执行，同一个类被两边各读成一次 **input**，
+   tiny-remapper 打 `duplicate input class` 警告并按 InputTag 去重合并；
+4. 去重合并的 tag 归属在并发下不稳定，core 的 `apply(tag)` 一筛就把 pathing
+   的类整个筛掉——输出 0 个。
+
+修法（两个项目都要）：
+
+```groovy
+tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
+    it.remapperIsolation.set(true)   // 各项目独享 remapper
+}
+```
+
+验证：clean 构建稳定 243 个 pathing 类 + 339 总类；junit 依赖恢复后 55 条测试照跑全绿。
+**以后丢类先查这个，别再冤枉依赖。**
+
+### 14.6 验证
+
+- `:core:build` 绿（含 55 测试）；`server-api-check.py`：447 条 MC 引用全对上，客户端专属引用 0。
+- smoke-test.py 扩了权限命令树（mode / mode owner / rules list·add·reset），见下一节实测结果。

@@ -35,3 +35,11 @@ dependencies {
     // slf4j 不是：1.16.5 的类路径上完全没有它。只编译用，运行期由 core 内嵌。
     compileOnly 'org.slf4j:slf4j-api:1.7.36'
 }
+
+// remapJar 独占 remapper：core 侧的发行 jar 平铺了本模块的类，若与 core 共享
+// tiny-remapper（loom 0.12 默认跨项目共享），同一个类会被两个项目各自读成 input，
+// 按 InputTag 去重后归属不稳定，会导致 core 或本模块的发行 jar 间歇性丢光 pathing 类。
+// 详见 core/build.gradle 里的说明。两边都要设。
+tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
+    it.remapperIsolation.set(true)
+}

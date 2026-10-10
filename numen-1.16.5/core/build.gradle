@@ -55,7 +55,21 @@ dependencies {
     // 所以 slf4j-api 用 1.7.36（ai/build.gradle 里也是这个版本）。
     include 'org.slf4j:slf4j-api:1.7.36'
     include 'org.apache.logging.log4j:log4j-slf4j-impl:2.8.1'
+
+    // 单元测试(归位阶段 1 起):照上游 api/common/build.gradle 的 JUnit 5 配置。
+    // MC 的类在测试里用得到(FakeWorld、注册表引导),Loom 会把 named jar 挂上测试类路径。
+    // （2026-10-11 曾冤枉过这三行：丢 pathing 类的真凶是跨项目共享 remapper，见文末说明。）
+    testImplementation platform('org.junit:junit-bom:5.11.4')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
+
+// JUnit 5 平台。bisect 期间曾冤枉过它：丢 pathing 类的真凶是跨项目共享 remapper（见文末）。
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+
 
 loom {
     // 1.16.5 的 Player.DATA_PLAYER_MODE_CUSTOMISATION 是私有的，
@@ -101,4 +115,18 @@ loom {
 tasks.named('jar', Jar) {
     dependsOn ':pathing:classes'
     from({ project(':pathing').sourceSets.main.output })
+}
+
+// ⚠️ remapJar 必须**独占 remapper**（loom 0.12 默认跨项目共享 TinyRemapperService）。
+//
+// 默认行为：core 与 pathing 的 remapJar 共用同一个 tiny-remapper 实例（服务 id 只含
+// mappings+任务名，不含项目路径）。core 的发行 jar 里平铺着 pathing 的类（上面的 from），
+// 而 pathing 自己的 dev jar 又作为 compileClasspath 出现——于是同一个类被两边各自读成
+// **input**，tiny-remapper 按 InputTag 去重合并。一旦 pathing 侧先注册（两个 prepare 任务
+// 是并发的，顺序不定），合并后的 InputTag 归属就不稳定，core 的 apply(tag) 会把 pathing
+// 的类整个筛掉——发行 jar 里 pathing 一个类都不剩，而 dev jar 明明有 243 个。
+// 2026-10-11 实测：`remapperIsolation = true` 后各项目独享 remapper，core 稳定输出全部类。
+// 注意：这不是「要不要优化」的问题，是不加就**必然间歇性丢类**的问题。
+tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
+    it.remapperIsolation.set(true)
 }
