@@ -1808,4 +1808,11 @@ Lua 脚本执行都在主线程**。单人服无感，10 个玩家各带一个�
 「推理在你本机发起，用你自己的 API key」——那是**客户端大脑**时代的说法，与 A 计划正好相反
 （会让服主以为玩家自带 key、服务端不用配）。两处都已改成 A 计划的说法。
 
+**⚠️ 口径更正（2026-10-11 晚）**：上面「`program/`、`network/` 都不在归位范围内」**说得太粗**。
+实测发现 `task`/`event` 真的依赖它们：`program/` 里既有**传输半边**（对端是客户端大脑，确实不用搬），
+也有**服务端半边**（`ServerPrograms`/`ProgramLimits`/`RunModules`/`ModuleCache`…，与大脑在哪无关，
+**该搬**——`TaskPersistence.replay` 要用）。准确的边界表见
+[`RESTORE_PLAN_V2.md`](./RESTORE_PLAN_V2.md) §6。
+顺带：`ProgramLimits` 就在 `program/` 服务端半边里，搬它正好补上本文上面记的那个「多人服优先项」。
+
 
