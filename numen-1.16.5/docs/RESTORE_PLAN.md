@@ -1,9 +1,11 @@
 # 归位计划：把本仓带回到对标原版的结构
 
-> ⚠️ **这是 v1（历史记录）。执行请看 [`RESTORE_PLAN_V2.md`](./RESTORE_PLAN_V2.md)。**
-> v2 在动手前实测了依赖，更正了三处：`sdk`↔`task` 是**循环依赖**（v1 的阶段顺序写反）、
-> 这一批的真实闭包是 **69 文件 / ≈7360 行**（v1 估 58/5926）、`program` 被踩到**三处**需要接缝。
+> ⚠️ **这是 v1（历史记录）。执行请看 [`RESTORE_PLAN_V3.md`](./RESTORE_PLAN_V3.md)。**
 > v1 的分层判断、下面这 3 处更正、工作量表**仍然有效**，别重做。
+> 但有三处已被后续实测推翻，别照抄：
+> ① `sdk`↔`task` 是**循环依赖**，阶段 1/2 要合并（v1 顺序写反）；
+> ② 这一批实测 **90 文件 / 8814 行**（v1 估 58/5926）；
+> ③ 「`program/` 不搬」**口径太粗**——`program/` 的服务端半边（14 文件）本来就该搬，见 v3 §六。
 
 > 本计划是 [`UPSTREAM_COMPARISON.md`](./UPSTREAM_COMPARISON.md) 的后续——把其中"第 2 节 D 项"的缺口逐项归位。
 > 目标：**消除本仓自写子集**（`Acts.java` / `NumenTools.java` / `CompanionScript.java` / `CompanionNav`·`CompanionPorts` 壳），用上游原版对应件替换，达到**结构对齐**原版（1.20.1）。
