@@ -13,8 +13,12 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 - **外接大脑**：MC 服务端只暴露一个内置的 MCP 服务端，真正的 LLM 循环跑在 **Minecraft 之外**
   （另一台机器/另一个进程），服务端不存 key、也不扛推理算力。
 
-两种都**不需要玩家装客户端 mod**——同伴是服务端假玩家，征询走聊天按钮，
-原版客户端连上就能用（少了自绘的 G 面板）。
+两种都**不需要玩家装客户端 mod**：同伴是服务端假玩家、征询走聊天按钮，
+所以原版客户端连上就该能用（只少了自绘的 G 面板）。
+
+> ⚠️ 但这一点**还没用「纯原版客户端」实测过**——目前所有端到端验证用的都是装了模组的
+> Fabric 客户端（`fabric.mod.json` 里也没有 `custom` 载荷要求，理论上不需要客户端）。
+> 上多人服之前建议先拿一个原版客户端连一次确认。
 
 > 本仓是**非官方移植**。上游源码许可 LGPL-3.0-only。
 
@@ -24,30 +28,42 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 
 | 部分 | 状态 |
 |---|---|
-| 引擎层 `lua/` `agent/` `ai/`（166 个文件） | ✅ **逐字照搬上游**，已验证编译通过 |
-| 引擎层编译验证 | ✅ 123 个主源码 → 364 个 class，零错误（Temurin JDK 17） |
-| `core/` Minecraft 适配层 | 🟡 **已写出，未编译**——本机网络到不了 Fabric 仓，见下 |
-| 寻路 `pathing/` | ❌ 未搬。现在 `goto` 是直线走 |
-| 客户端界面 / 按键 | ❌ 未做。现在走 `/numen` 命令 |
-| 完整任务集（建造/战斗/钓鱼/开箱/合成） | ❌ 未搬 |
+| 引擎层 `lua/` `agent/` `ai/`（124 主源码 + 43 测试） | ✅ **逐字照搬上游**，编译通过，单元测试全绿 |
+| `core/` Minecraft 适配层（57 主源码 / 10467 行） | ✅ 已编译；**真机跑通**（专用服务端 + 真实 1.16.5 客户端） |
+| 寻路 `pathing/`（117 文件 / 13316 行） | ✅ 已搬（A* + 手搬的 DDA 视线），真机验证能绕障走通 |
+| 行为许可层 `permission/`（17 文件） | ✅ 已搬：`Gate`（主人三层 + 出厂表）、`Rule` 解析器、`PlacedBlocks` 账本、`ConsentDesk` 征询，外加 `/numen permission` 与 `/numen consent` 命令树 |
+| 权限闸接线 | ✅ `mine` / `use_block` / `drop` 过闸（ASK 时把这次调用**停在原地**发征询，答复后带回同一次调用重跑）；Lua 的 `numen.inv.drop` / `numen.use.block` 同步过闸；寻路那条路由 `GateTerrain` 逐格裁决 |
+| 外接大脑（MCP） | ✅ `core/mcp/`：JDK `HttpServer` 上手写的 MCP 服务端（JSON-RPC 2.0），外部 agent 可全程驱动同伴；外脑驱动期间内置大脑停牌 |
+| 工具表 | 🟡 **12 个**原子动作（上游 44 个），仍是本仓的扁平表，未换上游 `ToolRegistry` |
+| 客户端界面 | 🟡 G 面板（**G** 键）是**自绘**的，不是上游原版 UI |
+| 征询界面 | 🟡 聊天消息 + 可点击按钮（`RUN_COMMAND`）——这是 A 计划的**最终形态**，不是过渡（`network/` 不搬） |
+| 完整任务集（建造 / 战斗 / 钓鱼 / 开箱 / 合成… 13 族） | ❌ 未搬（归位计划阶段 5） |
+| `sdk/`（`@Fn` API 框架） | ❌ 未搬（归位计划阶段 1 的另一半） |
+| 并发与每刻主线程预算 | ❌ 未做——`program/ProgramLimits` 不在 A 计划内，做多人服要另补这条闸 |
 
-**一句话**：引擎（最难的部分）已经站在 1.16.5 上了，Minecraft 适配层写完了主体，
-但**还没有在能联网的机器上跑过一次编译**。第一次编译大概率要修几处残留的 API 名差——
-`docs/PORTING.md` 第二节已经把查证过的差异全列出来了，照着改就行。
+**一句话**：引擎 + 适配层 + 寻路 + 权限层都站在 1.16.5 上了，**真机跑得通**（专用服务端与真实客户端
+的端到端测试都验过，见 `docs/PORTING.md` §11 / §16 / §17）。离上游还差的是**任务框架与 13 族任务本体**、
+`sdk/`，以及工具表 / 客户端 UI 这两处本仓自写的简化版。阶段划分与进度见 `docs/RESTORE_PLAN.md`。
 
 ---
 
 ## 构建状态
 
-**已经编出来了。** 2026-10-09 在本机跑通：
+**已编译、已在真机跑通。** 本机（Windows + Temurin JDK 17）实测：
 
 ```
-./gradlew build           ✅ BUILD SUCCESSFUL
-  产出 core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar    (592 KB)
+./gradlew :core:build                    ✅ BUILD SUCCESSFUL
+  产出 core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar    (≈1.2 MB)
   └─ META-INF/jars/  agent + ai + lua 三个嵌套 jar 已就位
+  └─ 平铺 346 个 class = pathing 235 + core 111
 
-./gradlew :lua:test :agent:test :ai:test    ✅ 465 tests / 0 failures
+./gradlew :lua:test :agent:test :ai:test :core:test    ✅ 525 tests / 0 failures
+  lua 34 · agent 283 · ai 148 · core 60
 ```
+
+真机验证（专用 Fabric 1.16.5 服务端 + 真实 1.16.5 客户端 + 外接大脑）跑通过：召唤同伴、
+寻路走过去、挖方块、放置账本生效、权限征询往返（放行 / 要问 / 记住 / 拒绝）、
+`GateTerrain` 拒绝挖石头。细节见 `docs/PORTING.md` §11 / §16 / §17。
 
 `maven.fabricmc.net` 这个 Cloudflare 域名**时通时不通**（第一次全超时，第二次通）。
 解法不是代理，是把**阿里云公共仓排到仓库列表最前面**——loom 那些量大的传递依赖
@@ -56,8 +72,6 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 
 若第一次仍报 `Could not download`，**直接重跑**：Gradle 会保留已下到的部分，
 通常第二三次就过（本次是第 3 次拉全 fabric-loom 的）。
-
-> 还没在真实 1.16.5 客户端里跑过。`./gradlew runClient` 的冒烟测试是下一步。
 
 ---
 
@@ -124,7 +138,7 @@ Immediate reason: [HARD_DEP_NO_CANDIDATE numen ... {depends fabric-api @ [*]}]
 ## 用法
 
 ```
-/numen config apiKey sk-xxxxxx          填你自己的 key
+/numen config apiKey sk-xxxxxx          填服务端的 key（内置大脑用）
 /numen config model gpt-4o-mini         或 claude-sonnet-4-... 等
 /numen config provider openai           openai / anthropic / deepseek / moonshot
 /numen config baseUrl https://api.openai.com/v1
@@ -135,13 +149,25 @@ Immediate reason: [HARD_DEP_NO_CANDIDATE numen ... {depends fabric-api @ [*]}]
 /numen status 小满                       看她此刻在干什么
 /numen list                              看看有谁
 /numen dismiss 小满                      遣散
+
+/numen permission mode 小满 ask           许可模式：ask / bypass / observe
+/numen permission rules list             看主人这一层写了哪些规则
+/numen permission rules add deny break(placed)     加一条（deny / ask / allow 三张表）
+/numen permission rules remove deny 1    按行号删一条
+/numen permission rules reset            清空
+/numen consent allow|remember|deny <id>  答复一条征询（也可以直接点聊天里的按钮）
 ```
 
-配置落在 `config/numen.json`。**key 只存在这个文件里**，只发给玩家自己选的服务商。
+配置落在**服务端** `config/numen.json`。**key 只存在这个文件里**，只发给选定的服务商。
+用**外接大脑**时打开 `config/numen/mcp_server.json` 的开关，服务端就不再需要 key。
 
-同伴现在会这六个动作：`say`、`get_status`、`inspect_block`、`scan_blocks`、`goto`、`mine`。
+同伴现在会这 **12 个**动作：`say`、`get_status`、`inspect_block`、`scan_blocks`、`goto`、`mine`、
+`use_block`、`inventory`、`equip`、`eat`、`drop`、`lua`。
 `mine` 走的是原版「玩家挖方块」那条路（`ServerPlayerGameMode.destroyBlock`），
 破坏速度、掉落、统计都照玩家来，不是 `setblock`。
+
+挖 / 放 / 丢之前一律先过权限层：**放行**就做；**要问**就把这次调用**停在原地**发一条征询，
+主人答复后带回同一次调用重跑；**拒绝**就回一句为什么。
 
 ---
 
@@ -149,28 +175,43 @@ Immediate reason: [HARD_DEP_NO_CANDIDATE numen ... {depends fabric-api @ [*]}]
 
 ```
 numen-1.16.5/
-├── lua/        ← 逐字照搬：Lua 5.2 沙箱虚拟机（纯 JVM）
-├── agent/      ← 逐字照搬：ReAct 循环内核 + 事件队列（纯 JVM）
-├── ai/         ← 逐字照搬：LLM 连接层，5 套协议（纯 JVM）
-├── core/       ← 新写：Minecraft 1.16.5 适配层（模组本体）
+├── lua/        ← 逐字照搬：Lua 5.2 沙箱虚拟机（纯 JVM，50 文件）
+├── agent/      ← 逐字照搬：ReAct 循环内核 + 事件队列（纯 JVM，44 文件）
+├── ai/         ← 逐字照搬：LLM 连接层，5 套协议（纯 JVM，30 文件）
+├── pathing/    ← 照搬并适配：寻路（A* + 地形分析 + 视线），要对着 MC 编译（117 文件）
+├── core/       ← 新写：Minecraft 1.16.5 适配层（模组本体，57 文件）
 │   └── src/main/java/com/dwinovo/numen/core/
 │       ├── NumenCoreFabric.java    入口
-│       ├── body/                   键盘 / 物理步进 / 交互距离
 │       ├── entity/                 假玩家身体、工厂、花名册
 │       ├── agent/                  大脑与工具表
+│       ├── nav/                    寻路接入（CompanionNav / CompanionPorts / GateTerrain）
+│       ├── permission/             行为许可层（Gate / Rule / RuleSet / ConsentDesk / PlacedBlocks…，17 文件）
+│       ├── mcp/                    外接大脑（MCP 服务端 + 配置 + 驱动闸）
+│       ├── task/                   动作层（Acts 等，本仓自写的子集）
+│       ├── script/                 Lua 绑定
+│       ├── client/                 G 面板、离线账号修复
+│       ├── mixin/                  mixin（放置账本、离线账号；客户端那份在 mixin/client）
 │       ├── command/                /numen
-│       └── config/                 config/numen.json
+│       ├── config/                 config/numen.json
+│       └── data/ llm/ net/         词表子集 / LLM 门面 / 面板网络
 └── docs/
-    ├── PORTING.md      ← 逐条核过的 1.20.1 → 1.16.5 API 差异表 + 阶段计划
-    └── mm.py           ← 查官方映射的小工具（本文所有 API 结论靠它核的）
+    ├── PORTING.md             ← 逐条核过的 1.20.1 → 1.16.5 API 差异表 + 各阶段实录
+    ├── RESTORE_PLAN.md        ← 归位计划：消除 4 处自写子集，分 6 阶段
+    ├── UPSTREAM_COMPARISON.md ← 与上游的结构差异对照
+    ├── PERMISSION-PLAYTEST.md ← 权限层的真机试跑清单
+    └── mm.py                  ← 查官方映射的小工具（本文所有 API 结论靠它核的）
 ```
 
 ---
 
 ## 想接着做
 
-看 `docs/PORTING.md` 第五节。按建议顺序是：
-**客户端体验 → 寻路 → 完整任务集 → Lua 程序工具 → 外接大脑/插件**。
+看 `docs/RESTORE_PLAN.md`——归位计划的 6 个阶段，目标是把本仓 4 处自写子集
+（`Acts` / `NumenTools` / `CompanionScript` / `CompanionNav`·`CompanionPorts`）换回上游原版写法。
+**当前在阶段 1 的一半**：`permission/` 已落地，`sdk/` 未搬。
+
+按 A 计划，`program/`（客户端↔服务端传输层）、`network/`、客户端大脑**不在归位范围内**——
+它们不是欠账，是这套「大脑在服务端」的架构有意不要的一层。详见 `docs/PORTING.md` §17.7。
 
 `docs/PORTING.md` 第二节那张表是接着做的人最该先读的东西：
 里面每一条都是「上游那样写、1.16.5 上编译不过」的坑，对着官方映射核过，不用再踩一遍。
