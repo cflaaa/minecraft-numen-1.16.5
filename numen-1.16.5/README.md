@@ -16,9 +16,12 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 两种都**不需要玩家装客户端 mod**：同伴是服务端假玩家、征询走聊天按钮，
 所以原版客户端连上就该能用（只少了自绘的 G 面板）。
 
-> ⚠️ 但这一点**还没用「纯原版客户端」实测过**——目前所有端到端验证用的都是装了模组的
-> Fabric 客户端（`fabric.mod.json` 里也没有 `custom` 载荷要求，理论上不需要客户端）。
-> 上多人服之前建议先拿一个原版客户端连一次确认。
+> ✅ **已实测（2026-10-11）**：起专用服务端 + 一个**纯原版客户端**（同一份客户端 jar，
+> 把 classpath 上那 3 个 fabric 库摘掉、主类换回 `net.minecraft.client.main.Main`）——
+> 连得上、没被踢，而且**收到了同伴的聊天**：客户端自己的日志里有
+> `[CHAT] Alice joined the game` 与 `[CHAT] <Alice> …`。服务端侧也没有任何自定义通道告警
+> （`NumenPanelServer` 发之前先问 `ServerPlayNetworking.canSend`，没有通道的客户端就不发）。
+> 所以「不需要客户端 mod」这条是**验过的**，不是推断。复现：`.workbuddy-ai/tmp/vanilla-client-e2e.py`。
 
 > 本仓是**非官方移植**。上游源码许可 LGPL-3.0-only。
 

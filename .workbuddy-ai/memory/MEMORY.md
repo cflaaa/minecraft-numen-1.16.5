@@ -57,6 +57,29 @@
 由于选了外接大脑，`program/`、`network/`、客户端大脑**永久不在归位范围内**——不是欠账，是这套架构
 有意不要的一层（RESTORE_PLAN.md 的「🔴 要你拍板」已标为 ✅ 已拍板）。详见 PORTING.md §17.7。
 
+### 测试方案（两种，按需选；2026-10-11 定）
+
+**1. 本机（默认，绝大多数情况用这个）**
+`.testserver/` 专用 Fabric 1.16.5 服务端（端口 **25565**）+ 本机客户端，全在本机。
+公共驱动 `_perm_live_common.py`（起服/起客户端/MCP/日志等待），用例在 `.workbuddy-ai/tmp/`：
+`perm-e2e.py`（权限层）、`nav-gate-e2e.py`（GateTerrain）、`mod-load-check.py`（元数据加载）、
+`vanilla-client-e2e.py`（纯原版客户端）。**服务端控制台 stdin 可用**（`/execute as … run …`），
+MCP 端口 **8766** 可直连 → 能召唤/驱动同伴。
+→ **用**：需要服务端控制台或 MCP、需要受控地形/新世界、要测刚编出来的 jar、要快速迭代。
+
+**2. NAS 192.168.1.149（跨机 / 真部署）**
+容器 `mc1165-test`（itzg，Fabric 1.16.5，宿主端口 **25586**，online-mode=false），
+数据 `/vol1/1000/docker/mc1165-test/data`。部署/更新：`ssh-run.py` + `.workbuddy-ai/tmp/deploy-mc.py`
+（上传 compose+mods、pull、compose up）。本机客户端连 `192.168.1.149:25586`。
+⚠️ **RCON 关着、MCP 端口没发布** → 没有服务端控制台、不能用 MCP 驱动同伴。
+⚠️ **容器平时是 down 的**（`docker ps -a` 里连记录都没有），要用得先 `cd 该目录 && sudo docker compose up -d`。
+⚠️ 镜像必须用 `docker.m.daocloud.io`（`docker.mslmc.cn` **不代理 itzg**）——`deploy-mc.py` 原先写错，已改。
+→ **用**：验证真实部署 / 跨机连接、长时间挂着、不想占本机资源。
+
+> ⚠️ **跑 `ssh-run.py` 要用带 paramiko 的那个 python**：
+> `C:/Users/cfl/.workbuddy-ai/binaries/python/envs/default/Scripts/python.exe`
+> （managed 3.13.12 里没装 paramiko，直接跑会 `ModuleNotFoundError`）。
+
 ### 环境坑
 
 - 本机 `http_proxy` 会代理 localhost → Python 用 `ProxyHandler({})`，curl 用 `--noproxy '*'`。
