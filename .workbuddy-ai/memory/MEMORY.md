@@ -57,6 +57,19 @@
 由于选了外接大脑，`program/`、`network/`、客户端大脑**永久不在归位范围内**——不是欠账，是这套架构
 有意不要的一层（RESTORE_PLAN.md 的「🔴 要你拍板」已标为 ✅ 已拍板）。详见 PORTING.md §17.7。
 
+### ⚠️ 归位阶段 1/2：sdk ↔ task 循环依赖（2026-10-11 实测）
+
+- **`sdk` 与 `task` 互相依赖，必须同批搬**——RESTORE_PLAN 里「先 sdk 后 task」的顺序是错的
+  （详见 `RESTORE_PLAN.md` 「更正 4」）。
+- **扫依赖要连「同包引用」一起算，只看 `import` 会漏**：`TaskDispatch` 的 import 只有 `agent`+`entity`，
+  但它同包调用 `CompanionTickDispatcher` / `TaskPersistence`，后者一路拖到 `program`（A 计划不要的那层）。
+- 这一批的真实闭包 **≈75 文件 / ≈8000 行**（计划估 58/5926，低估约 35%）：sdk + task 缺件 + `script/`
+  + `event/NumenEvents` + `mc/{Echo,Completions}` + `api/Internal` + `entity/` 补件 + `agent/tool/api/ToolContext`。
+- **三处 A 计划接缝**：① `TaskPersistence.replay`（`ServerPrograms.launch` → 改用 `CompanionScript.run`）；
+  ② `NumenEvents`（`NumenNetwork` → 面板通道或日志）；③ tick 驱动（上游 `CompanionTickDispatcher` vs 本仓
+  `NumenPlayer.tick()`）。
+- **搬运脚本**：`.workbuddy-ai/tmp/port-sdk-task.py`（拷 60 文件 + 改包名/跨包 import，1 秒重放；实跑只报 11 个错）。
+
 ### 测试方案（两种，按需选；2026-10-11 定）
 
 **1. 本机（默认，绝大多数情况用这个）**

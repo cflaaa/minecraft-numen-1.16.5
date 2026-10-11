@@ -46,6 +46,44 @@
 > 因此 `program/`、`network/`、客户端大脑**都不在归位范围内**；它们不是"欠账"，
 > 而是这套架构**有意不要**的一层，以后不要在缺口清单里重复登记。
 
+**❌ 更正 4（2026-10-11，动手前实测）：`sdk` 与 `task` 是**循环依赖**，阶段 1/2 必须合并。**
+上面「分层顺序 permission → sdk → task」在 sdk 与 task 之间**写反了**。实测（import 与**同包引用**
+都算——只看 import 会漏掉同包耦合，我第一次就是这么漏的）：
+
+```
+sdk  → task : Dispatcher / ServerCall / Consents / Job 用 TaskDispatch / TaskRecord / TaskResult
+task → sdk  : TaskApi / TaskRecord 用 ServerCall / ApiFunction / Call + Fn/SeeAlso/Omitted/Note/Example/Doc
+```
+
+而且从 sdk 往下一走，闭包比估计的大得多：
+
+| 件 | 实测 | 为什么被拖进来 |
+|---|---|---|
+| `sdk/` | 39 文件 / 4026 行 | 本体（`ApiTester` 依赖 `program`，A 计划下不搬） |
+| `task/` 缺件 | 19 文件 | 另 5 个第一刀已搬（`Task`/`TaskResult`/`TaskSelector`/`TaskState`/`Preparation`） |
+| `script/` | 3 文件 / 837 行 | `ApiDocs` / `HelpApi` 要 `Modules` |
+| `event/NumenEvents` | 1 文件 / 378 行 | `TimerRegistry` 要它 |
+| `mc/Echo`+`Completions` | 237 行 | `OnHer` 要它们 |
+| `api/Internal` | 30 行 | `Consents` 要它 |
+| `entity/` 补件 | `CompanionRegistry` / `CompanionSpeech` / `InputDriver` / `EventOutbox` | `TimerRegistry` / `SpeakingLookChain` / `NumenEvents` |
+| `agent/tool/api/ToolContext` | — | `TaskDispatch.ctx` 要它 |
+| **合计** | **≈ 75 文件 / ≈ 8000 行** | 计划原先估 58 文件 / 5926 行，**低估约 35%** |
+
+**⚠️ 三处 A 计划接缝**（`program`/`network` 是 A 计划不要的那层，而 task 框架正好踩到）：
+
+1. `task/TaskPersistence.replay`：上游用 `ServerPrograms.launch(...)` 把重启前那一行 Lua 再跑一遍
+   → A 计划下改用本仓自己的 `CompanionScript.run`（或只记日志）。**3 个调用点。**
+2. `event/NumenEvents`：上游把事件推给**主人客户端**（`NumenNetwork` + `NumenEventPayload`）
+   → A 计划下没有 `network/`，改走本仓已有的面板通道或记日志。
+3. `task/CompanionTickDispatcher` / `task/CompanionBrain`：上游由它们驱动 tick、管大脑注册表；
+   本仓现在是 `NumenPlayer.tick()` 自己驱动（`ConsentDesk` + `NumenTools`）。
+   要不要换成上游那套驱动，是这一批的**第二个决定**（第一个是接缝 1、2 的写法）。
+
+> **建议拆成两刀**：
+> **刀 A** = `sdk` + `script` + `api/Internal` + `mc/{Echo,Completions}` + `task` 缺件 + `entity` 补件
+> + `event/NumenEvents`（含接缝 1、2）。跑通后 `@Fn` 框架才真正可用。
+> **刀 B**（可选、之后）= 是否把 tick 驱动换成上游的 `CompanionTickDispatcher`（接缝 3）。
+
 ---
 
 ## 0. 为什么这么排（依赖关系）
@@ -175,5 +213,7 @@ api/gear/  (Wardrobe 穿脱)   ← inventory 族 Equip 任务需要
 - **阶段 0 今天就能做**（改一句 `lua` 说明 + `stoppedBy` 占位）—— 零结构风险。
 - ~~**先定架构分叉**~~ ✅ **已定：A 计划**（大脑留服务端，`program/` 不搬），部署目标 = **外接大脑**。
   所以阶段 1 及以后一律按「服务端大脑」写，不需要为 `program/` 留接缝。
-- **阶段 1（`sdk` + `permission`）是第一个正式归位 PR** —— 它是所有后续的地基，越早搬，后续越顺。
+- **阶段 1 的另一半（`sdk`）与阶段 2（`task`）要合成一刀做**（见更正 4：两者循环依赖）。
+  这是所有后续的地基，越早搬越顺。**当前状态：`permission/` 已落地（2026-10-11），`sdk` 未搬。**
 - 阶段 2–5 每阶段独立成 PR，逐步把"子集"替换掉，最终在阶段 6 清干净。
+- ⚠️ 动手前先把更正 4 里那三处 A 计划接缝的写法定下来（尤其接缝 3：要不要换成上游的 tick 驱动）。
