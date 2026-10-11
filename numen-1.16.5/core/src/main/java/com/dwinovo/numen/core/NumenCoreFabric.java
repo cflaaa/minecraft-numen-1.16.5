@@ -43,6 +43,17 @@ import java.nio.file.Path;
  * 世界进出的只是 {@link McpActuator#bind}/{@link McpActuator#unbind} 那条引用：
  * 不在世界里时调用会如实回「现在不在世界里」，而不是把服务器整个收掉。
  * 这样单机「退到标题界面再进另一个世界」之后，外脑不用重连。
+ *
+ * <h2>关服时必须收 HTTP 服务器（2026-10-11 实测补的）</h2>
+ * {@code com.sun.net.httpserver.HttpServer} 的 <b>HTTP-Dispatcher 线程不是 daemon</b>，
+ * 而 JVM 只在「所有非 daemon 线程都结束」后才退出。所以只要不在关服时把 HTTP 服务器
+ * <b>真的收掉</b>，即使世界已经存完、netty 已经停干净，<b>专用服务端也会永远停在
+ * {@code /stop} 后面不返回</b>——表现是日志停在 "All chunks are saved"，进程不退出，
+ * 只能强杀。<b>这条只在专用服务端上暴露</b>（docker 里 SIGKILL 掉就有回档风险），
+ * 单机侧因为客户端退出走的是 {@code System.exit}（会强制终止 JVM）所以看不出来。
+ *
+ * <p>收的时机放在 {@code SERVER_STOPPING}，但<b>只对专用服务端收</b>：集成服务端在
+ * 「退到标题界面」时也会发这个事件，那一侧的 HTTP 服务器要留着（见上一段的设计）。
  */
 public final class NumenCoreFabric implements ModInitializer {
 
@@ -78,8 +89,17 @@ public final class NumenCoreFabric implements ModInitializer {
             }
         });
 
-        // 世界退了：只把「在不在世界里」这条引用摘掉，HTTP 服务器留着。
-        ServerLifecycleEvents.SERVER_STOPPING.register(server -> McpActuator.unbind());
+        // 世界退了：把「在不在世界里」这条引用摘掉。
+        // 专用服务端上，这次退出就是整个进程的终点——必须顺手把 MCP 的 HTTP 服务器收掉，
+        // 否则它的 HTTP-Dispatcher 线程（非 daemon）会把 JVM 钉住，/stop 永远不返回
+        // （日志停在 "All chunks are saved"，只能强杀）。集成服务端要留着给「换世界」用，
+        // 所以只在专用服务端收。详见类注释「关服时必须收 HTTP 服务器」。
+        ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+            McpActuator.unbind();
+            if (server.isDedicatedServer()) {
+                McpMode.instance().shutdown();
+            }
+        });
 
         CommandRegistrationCallback.EVENT.register((dispatcher, dedicated) -> NumenCommand.register(dispatcher));
 

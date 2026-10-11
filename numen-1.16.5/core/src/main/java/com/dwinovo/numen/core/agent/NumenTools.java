@@ -5,6 +5,13 @@ import com.dwinovo.numen.agent.provider.IToolSpec;
 import com.dwinovo.numen.agent.provider.LlmToolCall;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.nav.CompanionNav;
+import com.dwinovo.numen.core.permission.Action;
+import com.dwinovo.numen.core.permission.ConsentAnswer;
+import com.dwinovo.numen.core.permission.ConsentDesk;
+import com.dwinovo.numen.core.permission.ConsentItem;
+import com.dwinovo.numen.core.permission.Gate;
+import com.dwinovo.numen.core.permission.Permission;
+import com.dwinovo.numen.core.permission.Verdict;
 import com.dwinovo.numen.core.script.CompanionScript;
 import com.dwinovo.numen.core.task.act.Acts;
 import com.dwinovo.numen.pathing.body.BodyCompat;
@@ -14,6 +21,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.ArrayList;
@@ -39,6 +47,20 @@ import java.util.UUID;
  * <h2>动作是真的在做</h2>
  * {@code mine} 走的是 {@code ServerPlayerGameMode.destroyBlock}——就是原版服务端收到
  * 「玩家挖方块」包之后走的那一条路。不是 {@code setblock}，破坏速度、掉落、统计都照玩家来。
+ *
+ * <h2>动手之前先过权限层（2026-10-11 归位阶段 2）</h2>
+ * 会改世界、会动别人东西的三件——{@code mine}、{@code use_block}、{@code drop}——**一律先问
+ * {@link Permission}**，函数自己不写「能不能」。裁决三档：放行就做；拒绝就回一句「没做…为什么」；
+ * <b>要问</b>就把这次调用**停在原地**发起征询（{@link ConsentDesk}，主人在聊天栏看到可点击的
+ * 允许/记住/拒绝），每刻由 {@link #tick} 看答复，答复到了带着结论回到同一次调用上重跑。
+ *
+ * <p>口径照上游 {@code AbstractCompanionTask#permit}/{@code #consult} 搬：主人答应的清单作为
+ * **任务期授权**记在发起它的这批调用（{@link Job}）名下，进裁决快照，同一行规则问出来的同一种东西
+ * 不再问第二遍；这批活收场时授权一并清掉。只读的工具（{@code get_status}、{@code scan_blocks}…）
+ * 不过闸，走的是「看」不是「做」。
+ *
+ * <p>⚠️ {@code lua} 那条路**不能等**主人（一段 Lua 是同步跑完的），所以它的动手内置函数只做同步裁决，
+ * 「要问」时如实失败（见 {@code CompanionScript#guard}）。
  */
 public final class NumenTools {
 
@@ -207,9 +229,23 @@ public final class NumenTools {
         LlmToolCall walking;
         /** 这批调用已经结算过了，保证 {@code settled} 只报一次。 */
         boolean settled;
+        /** 已经 {@code sink.started} 报过的调用下标：为等征询停在原地、之后回来重跑时不重复报。 */
+        int startedAt = -1;
+
+        // ---- 权限层（归位阶段 2）：这批调用挂着的那张征询号 ----
+        /** 挂着的那条征询（还没答复）；null = 没有在等主人。 */
+        ConsentDesk.Ticket ticket;
+        /** 问出去的那份清单：主人拒绝时写回执要用它。 */
+        List<ConsentItem> asked;
+        /** 主人答复下来了、还没被这次调用消费掉的结论。 */
+        ConsentAnswer answer;
+        /** 这次调用没过权限层的理由（{@link Permit#REFUSED} 时填）。 */
+        String refusal;
+        /** 主人已经为这次调用点过头：裁决若还判 ASK，直接按放行算，不问第二遍。 */
+        boolean ownerAgreed;
 
         Job(List<LlmToolCall> calls, ToolPort.Sink sink, CompanionBrain brain) {
-            this.calls = calls;
+            this.calls = new ArrayList<>(calls);
             this.sink = sink;
             this.brain = brain;
         }
@@ -217,15 +253,29 @@ public final class NumenTools {
 
     /** 引擎派了一批调用。 */
     public static void run(NumenPlayer body, CompanionBrain brain, List<LlmToolCall> calls, ToolPort.Sink sink) {
-        Job job = new Job(new ArrayList<>(calls), sink, brain);
+        Job job = new Job(calls, sink, brain);
         JOBS.put(body.getUUID(), job);
         advance(body, job);
     }
 
-    /** 服务端每刻推进一次长动作。 */
+    /** 服务端每刻推进一次：先看挂着的征询有没有答复，再推进长动作（走路）。 */
     public static void tick(NumenPlayer body) {
         Job job = JOBS.get(body.getUUID());
-        if (job == null || job.nav == null) {
+        if (job == null) {
+            return;
+        }
+        // 在等主人答复：有结论了就带着结论回到那次调用上重跑（permit 会把结论消费掉）。
+        if (job.ticket != null) {
+            ConsentAnswer answer = job.ticket.poll();
+            if (answer == null) {
+                return;
+            }
+            job.ticket = null;
+            job.answer = answer;
+            advance(body, job);
+            return;
+        }
+        if (job.nav == null) {
             return;
         }
         String outcome = job.nav.step(body);
@@ -246,6 +296,8 @@ public final class NumenTools {
             if (job.nav != null) {
                 job.nav.stop();
             }
+            // 主人叫停：撤掉挂着的那条征询（主人看到是谁叫停的），并清掉它名下的任务期授权。
+            ConsentDesk.of(body).release(job, ConsentDesk.Withdrawal.OWNER_STOPPED);
             body.controls().releaseAll();
         }
     }
@@ -254,7 +306,11 @@ public final class NumenTools {
     private static void advance(NumenPlayer body, Job job) {
         while (job.index < job.calls.size()) {
             LlmToolCall call = job.calls.get(job.index);
-            job.sink.started(call);
+            // 为等征询停在原地、之后回来重跑时，同一次调用不重复报 started。
+            if (job.startedAt != job.index) {
+                job.startedAt = job.index;
+                job.sink.started(call);
+            }
 
             JsonObject args = args(call);
             switch (call.name()) {
@@ -276,11 +332,38 @@ public final class NumenTools {
                     job.index++;
                 }
                 case "mine" -> {
-                    job.sink.finished(call, mine(body, args));
+                    BlockPos target = pos(args);
+                    String blocked = mineBlocked(body, target);
+                    if (blocked != null) {
+                        // 空气、够不着：没必要为它去问主人，直接如实回。
+                        job.sink.finished(call, result(blocked, false, null));
+                    } else {
+                        Action action = Action.breakBlock(target, body.getLevel().getBlockState(target));
+                        Permit decision = permit(job, body, action);
+                        if (decision == Permit.WAITING) {
+                            return;   // 停在这次调用上，等主人答复
+                        }
+                        job.sink.finished(call, decision == Permit.REFUSED
+                                ? result(notDone(action, job.refusal), false, null)
+                                : mine(body, target));
+                    }
                     job.index++;
                 }
                 case "use_block" -> {
-                    job.sink.finished(call, Acts.useBlock(body, pos(args)));
+                    BlockPos target = pos(args);
+                    BlockState state = body.getLevel().getBlockState(target);
+                    if (state.isAir()) {
+                        job.sink.finished(call, "那一格是空气，没什么可用的");
+                    } else {
+                        Action action = Action.useBlock(target, state);
+                        Permit decision = permit(job, body, action);
+                        if (decision == Permit.WAITING) {
+                            return;   // 停在这次调用上，等主人答复
+                        }
+                        job.sink.finished(call, decision == Permit.REFUSED
+                                ? notDone(action, job.refusal)
+                                : Acts.useBlock(body, target));
+                    }
                     job.index++;
                 }
                 case "inventory" -> {
@@ -296,8 +379,21 @@ public final class NumenTools {
                     job.index++;
                 }
                 case "drop" -> {
-                    job.sink.finished(call,
-                            Acts.drop(body, text(args, "item"), intArg(args, "count")));
+                    String query = text(args, "item");
+                    ItemStack stack = Acts.findItem(body, query);
+                    if (stack.isEmpty()) {
+                        // 东西不在：让 Acts 去说「背包里没有…」，不必为它问主人。
+                        job.sink.finished(call, Acts.drop(body, query, intArg(args, "count")));
+                    } else {
+                        Action action = Action.drop(stack.getItem());
+                        Permit decision = permit(job, body, action);
+                        if (decision == Permit.WAITING) {
+                            return;   // 停在这次调用上，等主人答复
+                        }
+                        job.sink.finished(call, decision == Permit.REFUSED
+                                ? notDone(action, job.refusal)
+                                : Acts.drop(body, query, intArg(args, "count")));
+                    }
                     job.index++;
                 }
                 case "lua" -> {
@@ -322,6 +418,8 @@ public final class NumenTools {
         }
         if (!job.settled) {
             job.settled = true;
+            // 这批活收场：任务期授权只在发起它的这批调用里有效，一并清掉。
+            ConsentDesk.of(body).release(job, ConsentDesk.Withdrawal.TASK_ENDED);
             job.sink.settled();
         }
         JOBS.remove(body.getUUID());
@@ -406,20 +504,86 @@ public final class NumenTools {
         return out.toString();
     }
 
-    private static String mine(NumenPlayer body, JsonObject args) {
-        BlockPos pos = new BlockPos(intArg(args, "x"), intArg(args, "y"), intArg(args, "z"));
+    /** 挖之前的两条便宜检查（空气、够不着）：返回给模型看的一句话；没问题返回 null。 */
+    private static String mineBlocked(NumenPlayer body, BlockPos pos) {
         if (body.getLevel().getBlockState(pos).isAir()) {
-            return result("那一格本来就是空气", false, null);
+            return "那一格本来就是空气";
         }
         if (!BodyCompat.canReachBlock(body, pos, 0.0)) {
-            return result("够不着 " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
-                    + "（手臂只有 " + BodyCompat.blockReach(body) + " 格），先 goto 过去", false, null);
+            return "够不着 " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
+                    + "（手臂只有 " + BodyCompat.blockReach(body) + " 格），先 goto 过去";
         }
-        // 原版「玩家挖方块」那条路：破坏速度、掉落、统计都照玩家来。
+        return null;
+    }
+
+    /**
+     * 挖掉一格。**调用方先过 {@link #mineBlocked} 与权限层**——这里只管动手。
+     *
+     * <p>原版「玩家挖方块」那条路：破坏速度、掉落、统计都照玩家来。
+     */
+    private static String mine(NumenPlayer body, BlockPos pos) {
         boolean broke = body.gameMode.destroyBlock(pos);
         return result(broke
                 ? "挖掉了 " + pos.getX() + "," + pos.getY() + "," + pos.getZ()
                 : "挖不动 " + pos.getX() + "," + pos.getY() + "," + pos.getZ(), broke, null);
+    }
+
+    // =====================================================================
+    //  权限层（归位阶段 2）
+    // =====================================================================
+
+    /** 一个动作过权限层的结论。照上游 {@code AbstractCompanionTask.Permit} 搬（缩减版）。 */
+    private enum Permit { ALLOWED, WAITING, REFUSED }
+
+    /**
+     * 一个动作先过权限层，过了再做。放行返回 {@link Permit#ALLOWED}；不许或主人拒绝返回
+     * {@link Permit#REFUSED}（理由写在 {@code job.refusal} 里）；**要问**主人就发起征询、把这次调用
+     * 停在原地返回 {@link Permit#WAITING}——调用方见到它就 {@code return}，让 {@link #tick} 每刻来看；
+     * 主人答复之后 {@code tick} 会带着结论回到同一次调用上重跑，{@code job.answer} 就是那份结论。
+     *
+     * <p>口径照上游 {@code AbstractCompanionTask#permit}/{@code #consult} 搬：上游把「挂着的那张号」
+     * 记在任务对象上、每刻重调一次 {@code permit}；这里记在 {@link Job} 上，语义一样——同一行规则
+     * 问出来的同一种东西，主人答应后作为**任务期授权**进裁决快照，再问就是放行，不会重复问。
+     *
+     * <p><b>只在服务端主线程上调</b>（{@link #advance} 与 {@link #tick} 都在主线程）：
+     * {@code judgeLive} 要活读方块实体内容。
+     */
+    private static Permit permit(Job job, NumenPlayer body, Action action) {
+        if (job.answer != null) {
+            ConsentAnswer answer = job.answer;
+            job.answer = null;
+            if (!answer.allowed()) {
+                job.refusal = answer.refusal(job.asked == null ? List.of() : job.asked);
+                return Permit.REFUSED;
+            }
+            // 主人为这次调用点了头。清单已经作为任务期授权进了登记处的账，下面的裁决本该放行；
+            // 万一还判 ASK（规则中途被改过之类），也按放行算——已经问过一遍，不再问第二遍。
+            job.ownerAgreed = true;
+        }
+        ServerLevel level = body.getLevel();
+        Gate gate = Permission.gateFor(body);
+        Verdict verdict = gate.judgeLive(action, level);
+        return switch (verdict.kind()) {
+            case ALLOW -> Permit.ALLOWED;
+            case DENY -> {
+                job.refusal = verdict.reason();
+                yield Permit.REFUSED;
+            }
+            case ASK -> {
+                if (job.ownerAgreed) {
+                    yield Permit.ALLOWED;
+                }
+                List<ConsentItem> items = List.of(gate.consentItemLive(action, verdict, level));
+                job.asked = items;
+                job.ticket = ConsentDesk.of(body).ask(job, items);
+                yield Permit.WAITING;
+            }
+        };
+    }
+
+    /** 没过权限层时给模型看的那句话：说清「没做哪件事」和「为什么」。 */
+    private static String notDone(Action action, String why) {
+        return "没有做 " + action.describe() + "：" + why;
     }
 
     // =====================================================================

@@ -15,6 +15,9 @@ import com.dwinovo.numen.agent.script.ScriptCatalog;
 import com.dwinovo.numen.agent.script.ScriptRun;
 import com.dwinovo.numen.agent.script.ScriptType;
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.dwinovo.numen.core.permission.Action;
+import com.dwinovo.numen.core.permission.Permission;
+import com.dwinovo.numen.core.permission.Verdict;
 import com.dwinovo.numen.core.task.act.Acts;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -23,6 +26,7 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.item.ItemStack;
 
 /**
  * 让模型**写一段 Lua 一次做完几十步**——上游的核心卖点。
@@ -294,10 +298,44 @@ public final class CompanionScript implements ScriptCall.Host {
 
         register("inv", "items", none(), (body, args) -> Acts.bag(body));
         register("inv", "eat", Set.of("item"), (body, args) -> Acts.eat(body, textArg(args, "item")));
-        register("inv", "drop", Set.of("item", "count"),
-                (body, args) -> Acts.drop(body, textArg(args, "item"), intArgOr(args, "count", 0)));
+        register("inv", "drop", Set.of("item", "count"), (body, args) -> {
+            String query = textArg(args, "item");
+            ItemStack stack = Acts.findItem(body, query);
+            if (!stack.isEmpty()) {
+                // 动手之前过权限层。东西不在就不必问主人——直接交给 Acts 去说「背包里没有…」。
+                guard(body, Action.drop(stack.getItem()));
+            }
+            return Acts.drop(body, query, intArgOr(args, "count", 0));
+        });
         register("gear", "hold", Set.of("item"), (body, args) -> Acts.equip(body, textArg(args, "item")));
-        register("use", "block", xyz(), (body, args) -> Acts.useBlock(body, posArg(args)));
+        register("use", "block", xyz(), (body, args) -> {
+            BlockPos at = posArg(args);
+            guard(body, Action.useBlock(at, body.getLevel().getBlockState(at)));
+            return Acts.useBlock(body, at);
+        });
+    }
+
+    /**
+     * 脚本里动手之前过权限层（归位阶段 2）。
+     *
+     * <p>⚠️ 与工具那条路的差别：一段 Lua 是**同步跑完**的，等不了主人答复，所以这里只做同步裁决——
+     * 放行就过；不许抛 {@link ErrorKind#DENIED}；**要问**抛 {@link ErrorKind#NEEDS_CONSENT}
+     * （脚本 {@code pcall} 接得住，改走会等的工具 {@code use_block} / {@code drop} 即可）。
+     *
+     * <p>上游这条路经 {@code Consents.await} 能真的把这次调用挂起等主人，等 SDK 归位后换回来。
+     * 在那之前「要问」只能如实失败——**失败方向是关**，绝不偷偷放行。
+     */
+    private static void guard(NumenPlayer body, Action action) throws ApiError {
+        Verdict verdict = Permission.judge(body, action);
+        switch (verdict.kind()) {
+            case ALLOW -> { }
+            case DENY -> throw new ApiError(ErrorKind.DENIED,
+                    "did not run " + action.describe() + ": " + verdict.reason(), null);
+            case ASK -> throw new ApiError(ErrorKind.NEEDS_CONSENT,
+                    "did not run " + action.describe()
+                            + ": needs the owner's consent, and a script cannot ask — "
+                            + "use the use_block / drop tool instead", null);
+        }
     }
 
     /** 登记过的组名，按名字排（自检与日志用）。 */

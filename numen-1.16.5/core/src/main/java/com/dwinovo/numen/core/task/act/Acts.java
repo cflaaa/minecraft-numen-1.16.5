@@ -70,6 +70,20 @@ public final class Acts {
             return "瞄不准 " + at(pos) + "：转过去之后准星落在了别的东西上";
         }
         Effector.Use use = body.hands().use(hit);
+        if (use instanceof Effector.Use.Nothing) {
+            // 手里拿着方块、而这一面算出来的放置点正好是她自己站的那一格时，原版放不进去：
+            // BlockItem.canPlace → Level.isUnobstructed 拿 null 当「谁放的」（CollisionGetter 的默认实现），
+            // 于是**不会**把自己排除掉，她自己的身体挡住了这一格。真玩家此时也放不下（要跳起来才放得下）。
+            // 这句如实说出来，别让模型以为「点了没反应」是方块的问题。
+            BlockPos placeAt = hit.getBlockPos().relative(hit.getDirection());
+            BlockPos me = new BlockPos((int) Math.floor(body.getX()), (int) Math.floor(body.getY()),
+                    (int) Math.floor(body.getZ()));
+            if (placeAt.equals(me) && body.getItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND)
+                    .getItem() instanceof net.minecraft.world.item.BlockItem) {
+                return "点了 " + at(pos) + "（" + id(state) + "）：这一面算出来的放置点是 " + at(placeAt)
+                        + "，正是她站的那一格——原版不许把方块放进自己身体里，换一面（或者先把这一格空出来）再放";
+            }
+        }
         return describeUse(pos, state, use);
     }
 
@@ -197,6 +211,17 @@ public final class Acts {
     }
 
     // ==================== 小工具 ====================
+
+    /**
+     * 背包里 {@code query} 那一件（找不到是空栈）。
+     *
+     * <p>给调用方在**过权限层之前**先认一下：东西不在就没必要为它去问主人
+     * （{@link com.dwinovo.numen.core.agent.NumenTools} 的 {@code drop} 用它拼出要裁决的动作）。
+     */
+    public static ItemStack findItem(NumenPlayer body, String query) {
+        int slot = find(body, query);
+        return slot < 0 ? ItemStack.EMPTY : body.inventory.getItem(slot);
+    }
 
     /**
      * 按名字找背包里的一件（返回主背包/盔甲/副手那个统一下标，找不到 -1）。

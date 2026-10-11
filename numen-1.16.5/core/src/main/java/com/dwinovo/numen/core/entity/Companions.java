@@ -48,8 +48,17 @@ public final class Companions {
         NumenPlayer body = CompanionFactory.spawn(server, level, owner.getUUID(), name);
 
         // 落在主人身边（原版 placeNewPlayer 会按世界出生点安置，这里挪到主人脚边）。
-        Vec3 at = owner.position();
-        body.teleportTo(at.x, at.y, at.z);
+        //
+        // ⚠️ 不要直接照抄主人的坐标（2026-10-11 真机试跑踩到）：主人贴着天花板、在隧道里爬行、
+        // 站在熔岩边上、或者**人在半空**时，照抄坐标会把整只同伴塞进方块里 / 让她从高处掉下去——
+        // 玩家碰撞箱与方块重叠就每刻受伤、死、又落回同一处，直到主人碰巧走开（上游注释里的
+        // death loop）。上游为此有 SafeSpawn：先在主人周围找一个站得下的实心落脚点，
+        // **找不到才退回主人自己的坐标**（主人站在半砖/地毯上时，他自己的位置就是对的）。
+        Vec3 pos = SafeSpawn.findNear(level, owner.position());
+        if (pos == null) {
+            pos = owner.position();
+        }
+        body.teleportTo(pos.x, pos.y, pos.z);
 
         CompanionBrain brain = new CompanionBrain(body);
         BRAINS.put(body.getUUID(), brain);

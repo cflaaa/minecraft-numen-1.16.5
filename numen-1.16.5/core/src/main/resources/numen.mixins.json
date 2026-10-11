@@ -1,11 +1,13 @@
 {
     "required": true,
     "minVersion": "0.8",
-    "package": "com.dwinovo.numen.core.client.mixin",
+    "package": "com.dwinovo.numen.core.mixin",
     "compatibilityLevel": "JAVA_17",
-    "mixins": [],
+    "mixins": [
+        "BlockItemPlaceMixin"
+    ],
     "client": [
-        "NumenOfflineMultiplayerMixin"
+        "client.NumenOfflineMultiplayerMixin"
     ],
     "injectors": {
         "defaultRequire": 1

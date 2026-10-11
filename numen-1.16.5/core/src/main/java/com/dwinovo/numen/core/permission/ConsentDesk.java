@@ -366,9 +366,14 @@ public final class ConsentDesk {
         }
 
         private static MutableComponent button(String key, String command, ChatFormatting color) {
+            // ⚠️ 不要用 style.withUnderlined(true)（2026-10-11 真机踩到）：
+            // 那个成员在**专用服务端**的 jar 里被 ProGuard 裁掉了（合并 jar 里编译得过、
+            // 单机也不炸），一渲染征询卡片就 NoSuchMethodError → 整个服务端崩。
+            // 用 applyFormat(ChatFormatting.UNDERLINE)，它在服务端 jar 里还在。
+            // 详见 docs/PORTING.md §16.4 与 server-api-check.py。
             return new TranslatableComponent(key)
                     .withStyle(style -> style.withColor(color)
-                            .withUnderlined(true)
+                            .applyFormat(ChatFormatting.UNDERLINE)
                             .withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND, command)));
         }
 

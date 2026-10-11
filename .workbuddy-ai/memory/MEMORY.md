@@ -19,10 +19,14 @@
 - 查 API 用 `docs/mm.py`（左可读右混淆；查不出修饰符；会列出被 ProGuard 裁掉的成员）→ 真要调用的成员一律在真实 jar 上 `javap` 核一遍。
 - ProGuard 会裁「客户端才走」的成员，**只在专用服务端炸**（编译期看不出）；`server-api-check.py` 已覆盖 pathing 并处理 javap 折行。
 - mixin：客户端类进 `core.client.mixin` + mixins.json `client` 数组；`compatibilityLevel` 必须 JAVA_17；「没崩」≠「生效」，要看到 `Mixing ... into ...` 日志。
+- ⚠️ **mixin 配置的 `package` 是独占的**：`package` 指到的包下面**只许有 mixin 类**，否则宿主类一加载就 `IllegalClassLoadError: … is in a defined mixin package`，**服务端起不来**。
+- ⚠️ **原版不许把方块放进玩家自己身体里**（`CollisionGetter.isUnobstructed` 把 `null` 当「谁放的」，不排除放置者）。写测试/脚本时别点同伴**脚下**那一格：`placeAt = hit.getBlockPos().relative(hit.getDirection())` 只要等于她自己那一格，`BlockItem.place` 必返 `FAIL`。详见 PORTING.md §16.3。
+- 本机探针脚本取坐标一律 `math.floor`，**别用 `int()`**（截断，负坐标偏一格 → 会白跑几轮对照）。
 
 ### 已落地大件
 
 - **归位阶段 1（A 计划，2026-10-11）：permission/ 17 件套**——行为许可层（Gate 三层 owner 表 + 工厂表、Rule 解析器、PlacedBlocks 账本、PermissionStore、ConsentDesk 征询）+ `/numen permission|consent` 命令树 + 55 条单元测试全绿。征询 UI 暂走聊天按钮（RUN_COMMAND），network/ 落地后换回。适配表见 PORTING.md §14.2。真机 smoke-test 实测通过。
+- **归位阶段 2（2026-10-11）：Gate 接进 `mine`/`use_block`/`drop`**——ASK 时把这次调用**停在原地**发征询、答复后带回同一次调用重跑；Lua 的 `numen.inv.drop`/`numen.use.block` 同步过闸（ASK 抛 `NEEDS_CONSENT`，失败方向是关）；放置账本 mixin `BlockItemPlaceMixin` → `PlacedBlocks`。**真机 5/5 全通过**（放行/要问/放置账本/记住/拒绝），见 PORTING.md §16。
 - 离线多人修复：`core/client/NumenOfflineMultiplayer` + mixin（PORTING.md §8）。
 - G 面板：自绘界面，热区靠绘制时记 `hits`；布局验证用 `-Dnumen.panel=...` + `verify-panel.py`。
 - pathing 寻路：55 条编译差异全修完（§10.1 对照表）；`Sight.march` 是手搬 DDA，改动须重跑 20000 射线比对；已真机跑通（绕坑验证）。⏭ 未做：`GateTerrain`（路径可行性闸，已随 permission/ 落地的是行为许可 Gate，两回事）、`nav/` 其余件；默认 `dig=false place=false`。

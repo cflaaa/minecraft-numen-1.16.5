@@ -1434,3 +1434,243 @@ tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
 
 - `:core:build` 绿（含 55 测试）；`server-api-check.py`：447 条 MC 引用全对上，客户端专属引用 0。
 - smoke-test.py 扩了权限命令树（mode / mode owner / rules list·add·reset），见下一节实测结果。
+
+## 十五、真机跑权限层，跑出两个关服缺陷（2026-10-11）
+
+权限层落地后按用户要求「用本机的客户端连服务端实测一遍」。命令树、模式、规则、落盘全过，
+但**关服那一刻**冒出两个现象。两个都不是权限层本身的 bug，是「同伴以玩家身份住在服务端」
+这套架构在关服路径上的副作用。
+
+### 15.1 🔴 专用服务端 `/stop` 永不返回（MCP 的 HTTP 线程非 daemon）
+
+现象：`/stop` 后日志停在 `All chunks are saved`，**进程不退出**，`wait(90s)` 超时只能强杀。
+一度以为是同伴/玩家断线路径的问题，做了对照实验才定位：
+
+```
+stop-probe.py                       → ❌ 90s 未退出（挂住）
+NOPROBE_MODS=0 stop-probe.py        → ✅ 0.8s 自行退出 code=0   ← 把 numen jar 移走就好
+```
+
+也就是说**是模组导致的**。抓线程转储（`stop-dump.py` → jstack）直接看到元凶：
+
+```
+"DestroyJavaVM" ... wait
+"HTTP-Dispatcher" #53 ... runnable      ← 非 daemon！
+```
+
+`HTTP-Dispatcher` 是 `com.sun.net.httpserver.HttpServer` 的调度线程，来自外接大脑的
+MCP 服务器（`McpServer`）。**它不是 daemon**，而 JVM 只在「所有非 daemon 线程都结束」
+后才退出——世界存完了、netty 停干净了，它还在听端口，于是 `/stop` 永远卡在最后一步。
+
+根因不是忘了写：`McpMode` 里**早就有一个 `shutdown()`**（注释写着「服务器要关了：
+把 HTTP 服务器一起收掉，别留着线程」），**但从来没人调它**——`SERVER_STOPPING` 上
+只挂了 `McpActuator.unbind()`（那只摘「在不在世界里」的引用，是给「换世界」用的）。
+
+修法（`NumenCoreFabric`）：
+
+```java
+ServerLifecycleEvents.SERVER_STOPPING.register(server -> {
+    McpActuator.unbind();
+    if (server.isDedicatedServer()) {      // 只有专用服务端这次退出=进程终点
+        McpMode.instance().shutdown();     // 收 HTTP，放 HTTP-Dispatcher 走
+    }
+});
+```
+
+**为什么只对专用服务端收**：集成服务端「退到标题界面再进另一个世界」也会发
+`SERVER_STOPPING`，那一侧的 HTTP 服务器是**有意**留着给外脑不重连的（见 §14 那段设计）。
+单机侧不需要这里收：客户端退出走的是 `System.exit`，会强制终止 JVM，不等非 daemon。
+
+验证：`/stop` → **1.3s 自行退出 code=0**，日志多了
+`[numen] [numen-mcp] 外接大脑模式已关闭，内置大脑恢复接管`。
+
+> ⚠️ 这个坑对**部署**有实际意义：NAS 上那个 docker 测试服如果 `/stop` 挂住，
+> itzg 容器会等到超时后 SIGKILL——**有回档风险**。上游 1.20.1 没这毛病，
+> 因为上游的 MCP 服务器开在客户端；这一版把它搬到了服务端，才把这条带出来。
+
+### 15.2 ⚠️ 关服时真实玩家断线路径偶发 `StackOverflowError`（已定位 → 结论见 §15.3：**原版行为**）
+
+现象（`Server thread` 上，紧接在 `Saving players` 之后）：
+
+```
+[05:31:18] [Server thread/INFO]: T lost connection: Internal Exception: java.lang.StackOverflowError
+[05:31:18] [Server thread/INFO]: T left the game
+```
+
+`T` 是**真实玩家**（同伴 `Alice` 没这行——`FakeConnection` 把断线全程 no-op 掉了，
+见 §14/`FakeConnection` 的注释）。复现率：客户端 + 同伴同时在场时约 **2/4**；
+只连客户端、不召唤同伴时 **0/1**。世界照存、玩家照走，**不影响存档**，但很难看。
+
+定位手法（省得下次又猜）：vanilla 的 `log4j2.xml` 把 `Connection` 压在 info，
+而那句带完整栈的 `LOGGER.debug("Failed to sent packet", cause)` 是 debug 级，
+所以默认日志里**只有一句结论、没有栈**。做法是拿一个自定义 log4j2 配置
+（`Connection` 提到 debug）用 `-Dlog4j.configurationFile=` 覆盖过去：
+`.testserver/log4j-debug.xml` 就是这个（注意：**路径别带中文**，带中文时 log4j
+读不到文件、静默退回 classpath 的那份，表现为「一行 debug 都没有」）。
+
+> 状态：**已复现、栈已抓到、已定位到原版代码路径**——见 §15.3。模组不是原因。
+
+### 15.3 ✅ §15.2 的 `StackOverflowError` 是**原版 1.16.5 的行为**，不是移植引入的（2026-10-11 定案）
+
+**结论先说**：把 numen jar 从测试服 `mods/` 里整个移走（服务端纯原版、客户端照连），
+只要让客户端在关服窗口内持续发移动包，**同样能复现**
+`T lost connection: Internal Exception: java.lang.StackOverflowError`。
+报告见 `.testserver/logs/latest.log.soprev`（那一轮 `mods/` 里只有 fabric-api）。
+
+**完整链路（全部 vanilla，行号取自 loom 缓存的合并 named jar；运行时是 intermediary）**
+
+```java
+// ① netty 线程收到移动包 → handleMovePlayer 第一行就要求「回到服务端线程」
+//    ServerGamePacketListenerImpl.java:806
+public void handleMovePlayer(ServerboundMovePlayerPacket p) {
+    PacketUtils.ensureRunningOnSameThread(p, this, this.player.getLevel());
+    ...
+
+// ② PacketUtils:14（ServerLevel 重载）转发到 BlockableEventLoop 重载
+public static <T extends PacketListener> void ensureRunningOnSameThread(Packet<T> p, T l, ServerLevel lv) {
+    ensureRunningOnSameThread(p, l, lv.getServer());            // :14
+
+// ③ PacketUtils:18 —— 不在服务端线程 → 「排个任务」再抛异常
+public static <T extends PacketListener> void ensureRunningOnSameThread(Packet<T> p, T l, BlockableEventLoop<?> engine) {
+    if (!engine.isSameThread()) {                               // :18
+        engine.execute(() -> {                                  // :19
+            if (l.getConnection().isConnected()) p.handle(l);   // :21  ← 又回到 ①
+            else LOGGER.debug("Ignoring packet due to disconnection: " + p);
+        });
+        throw RunningOnDifferentThreadException.RUNNING_ON_DIFFERENT_THREAD;
+    }
+}
+
+// ④ BlockableEventLoop:91-96
+public void execute(Runnable r) {
+    if (this.scheduleExecutables()) this.tell(this.wrapRunnable(r));  // :92
+    else r.run();                                                    // :94  ← 内联执行！
+}
+
+// ⑤ 关键：MinecraftServer 覆写了 scheduleExecutables()，多挂了一个 stopped 条件
+//    MinecraftServer.java:1287
+public boolean scheduleExecutables() {
+    return super.scheduleExecutables() && !this.isStopped();
+    //   super() = runningTask() || !isSameThread()
+}
+```
+
+**为什么必爆**：`stopped == true` 时 ⑤ 恒为 `false` → ④ 的 `execute()` 走**内联**分支
+（直接在 netty 线程上 `r.run()`）→ `r` 又回到 ① → 仍判「不在服务端线程」→ 再内联……
+**无限递归 → SO**。正常游玩时 `stopped == false`，④ 走 92 行把任务塞进队列、
+netty 线程抛异常退出，什么都不会炸。
+
+**窗口从哪来**（也是原版的）：`stopped = true` 在 `runServer()` 里、**调 `stopServer()`
+之前**置位（bytecode 顺序：`putfield stopped` 偏移 289 → `invokevirtual stopServer` 偏移 293），
+而 `stopServer()` 紧接着就是 `Saving players`(`playerList.saveAll()`)。于是
+「`stopped==true` 且玩家连接还活着」这段窗口是**原版自带**的，实测约 1s
+（`Saving players` 05:59:32 → `Saving worlds` 05:59:33）。
+
+**为什么模组在场时更容易撞上（是概率，不是因果）**：窗口里只要**任意一个**
+`ServerboundMovePlayerPacket` 落在 netty 线程就必炸。挂机客户端一秒才补发一次位置包，
+所以「不动」的对照组 4 轮 0/4；让客户端**坠落**（`/tp T ~ 500 ~`，每 tick 都发）后
+**当轮就 1/1 命中**。模组在场时 `saveAll()` 要多存一个同伴、还要收 MCP，窗口略长 →
+撞上的概率上升。
+
+**要不要修：先不修。** 理由：只在关服瞬间触发、**不影响存档**（SO 在 netty 线程，
+`saveAll()` 在服务端线程，互不相干；`/stop` 照样 1.2s、`code=0` 正常退出），
+症状只是退出瞬间客户端弹一次 "Internal Exception"。真要消掉，唯一干净的办法是给
+`PacketUtils.ensureRunningOnSameThread` 挂 mixin（`engine instanceof MinecraftServer
+&& ((MinecraftServer) engine).isStopped()` 时直接 `cancel()`）——那是改 vanilla 行为，
+属于另一个决定，先记录不动。
+
+---
+
+## 十六、归位阶段 2：把权限闸接进「动手」的三个工具（2026-10-11）
+
+### 16.1 接线做了什么
+
+| 接线点 | 做法 |
+| --- | --- |
+| `agent/NumenTools` 的 `mine` / `use_block` / `drop` | 动手前一律先过 `Permission.gateFor().judgeLive()`。ALLOW 照做；DENY 回「没有做 `<动作>`：`<理由>`」；**ASK 发起 `ConsentDesk` 征询并把这次调用停在原地**，`tick` 每刻 poll，答复到了带结论回到同一次调用重跑 |
+| 口径 | 照上游 `AbstractCompanionTask#permit/#consult`：那张票记在 `Job` 上（不是任务对象上）。`Job` 新增 ticket/asked/answer/refusal/ownerAgreed/startedAt；收场与 `cancel` 都 `release(job, …)` 清任务期授权 |
+| Lua 那条路 | `script/CompanionScript`：`numen.inv.drop` / `numen.use.block` 同步过闸（`guard`）——放行就过、DENY 抛 `ErrorKind.DENIED`、ASK 抛 `NEEDS_CONSENT`（一段 Lua 同步跑完，等不了主人；**失败方向是关**，绝不偷偷放行） |
+| 放置账本 | 新 mixin `core/mixin/BlockItemPlaceMixin`（照上游搬；1.16.5 的 `BlockItem.place` 与 1.20.1 同名）→ `PlacedBlocks.placedBy`。之前本仓**根本没有写入点**，`placed` 信号永远是空的 |
+| 认东西 | `task/act/Acts.findItem`（`drop` 过闸前先认一下东西在不在，不在就不必为它问主人） |
+
+### 16.2 ⚠️ 试跑抓出的四个真问题（3 个已修）
+
+1. 🔴 **mixin 配置的 `package` 是独占的**。把 `package` 从 `…core.client.mixin` 开大到 `…core`
+   之后，`NumenCoreFabric` 一加载就
+   `IllegalClassLoadError: … is in a defined mixin package … cannot be referenced directly`，
+   **服务端起不来**。修法：mixin 只放 `com.dwinovo.numen.core.mixin[.client]`（该包下只许有 mixin 类）。
+2. 🔴 **两个 vanilla 成员被专用服务端 jar 裁掉**（编译期看不出来、单机也不炸）——
+   由 `server-api-check.py` 一把抓出，且**都是阶段 1 遗留**（征询卡片从没被渲染过，所以一直没暴露）：
+   - `Style.withUnderlined(Boolean)`（`class_2583.method_30938`）→ 渲染征询卡片按钮时 `NoSuchMethodError`，
+     **整个服务端崩**。改用 `applyFormat(ChatFormatting.UNDERLINE)`。
+   - `Block.getName()`（`class_2248.method_9518`）→ 给方块起名时同款崩。
+     改用 `new ItemStack(form).getHoverName()`；没有物品形态（水/火）就用注册名。
+3. 🔴 **召唤把同伴丢到主人坐标上**（`Companions.spawn`）：上游有 `SafeSpawn.findNear`，本仓直接照抄
+   `owner.position()`。主人**在半空**时同伴被一起带上去、摔死（日志 `Alice fell from a high place`）；
+   贴天花板/隧道里则卡进方块。已照上游补 `core/entity/SafeSpawn.java` 并接进 spawn。
+4. ⚠️ **`/numen permission …` 全部子命令都要「玩家身份」的来源**（内部 `getPlayerOrException()`），
+   **控制台直接发会失败**，测试里必须 `/execute as <主人> run …` 包一层。
+
+### 16.3 ⚠️ 「放置账本验不过」的真因：**原版不许把方块放进玩家自己身体里**（不是 bug）
+
+**症状**：`use_block` 点同伴**脚下**那一格（她手里拿着金块）→ 返回
+「点了 `x,y,z`（`minecraft:grass_block`），世界里没有方块变化」，世界真的没变。
+
+**真因**：`Aim.use` 按 `Direction.values()` 顺序（DOWN→UP→NORTH→…）挑第一个「用得上的面」，
+对着她脚下的方块必然先挑到 **UP**，算出的放置点 = `hitPos.relative(UP)` = **她自己站的那一格**。
+原版拒绝把方块放进玩家自己的身体：
+
+```java
+// CollisionGetter.isUnobstructed(BlockState, BlockPos, CollisionContext) —— loom merged-named jar, javap -c
+default boolean isUnobstructed(BlockState state, BlockPos pos, CollisionContext ctx) {
+   VoxelShape shape = state.getCollisionShape(this, pos, ctx);
+   return shape.isEmpty() || this.isUnobstructed((Entity) null, shape.move(x, y, z));   // ← null！
+}
+```
+
+**把 `null` 当「谁放的」传下去** → `isUnobstructed(Entity, VoxelShape)` 里 `entity == null`
+就不会排除任何人 → 玩家自己的身体挡住了那一格 → `BlockItem.canPlace` 返回 false →
+`getPlacementState` 返回 null → `BlockItem.place` 返回 `FAIL` → `PlayerHands.use` 收到 `Nothing`。
+真玩家此时也放不下（要**跳起来**才放得下，这就是原版「垫脚柱」要跳的原因）。
+
+**排查路上顺手核清的两件事**（都不是原因，记下来免得下次再查）：
+- `ServerPlayerGameMode.useItemOn` 里**没有** `mayInteract` 检查，直接
+  `stack.useOn(new UseOnContext(player, hand, hit))`；而且它在
+  `stack.isEmpty() || stack.getItem() 在冷却中` 时返回 `PASS`，其余一路往下。
+- 测试服 `spawn-protection=0`，所以不是出生点保护。
+
+**怎么改的**：
+- `Acts.useBlock`：`use == Nothing` 且「放置点 == 她站的那一格」且主手是 `BlockItem` 时，
+  回一句如实说明（「换一面，或者先把这一格空出来再放」），别让模型以为「点了没反应」是方块的问题。
+- 测试侧：`perm-e2e.py` 第 5 步改成在她旁边 `/setblock` 搭一格 stone、点它的**上面**
+  （放置点落在它头顶、不压她）；并把 `_perm_live_common.pos_of` 的坐标取整从 `int()` **截断**
+  改成 `math.floor`（负坐标截断会偏一格：`-154.5` 截断成 `-154`，正确是 `-155`）。
+
+> **移植提醒**：写「点脚下的方块」这类测试/脚本时，先想清楚放置点落在哪一格。
+> `placeAt = hit.getBlockPos().relative(hit.getDirection())`——只要它等于同伴自己站的那一格，原版必拒。
+
+### 16.4 验证结果：真机 5/5 全通过
+
+`perm-e2e.py`（起专用服 + 真客户端 + MCP 调工具 + 控制台以主人身份答复征询）重跑：
+
+- ✅ **放行路**：`mine` 脚下普通方块 → `挖掉了 208,3,-153`，**没弹征询**（出厂 allow 行覆盖）
+- ✅ **要问路**：`drop` → `[numen-consent] ask #1: drop 1 gold_block: drop(*)` → 答 ALLOW_ONCE →
+  **动作真的执行**（`丢掉了 Block of Gold ×1`）
+- ✅ **放置账本**：`use_block` 点旁边 stone → `210,4,-153: minecraft:air → minecraft:gold_block` →
+  加 `deny break(self_placed)` → `mine` 回
+  `没有做 break gold_block at 210,4,-153：denied by rule break(self_placed) (placed by herself)` →
+  去掉规则后再挖 → `挖掉了 210,4,-153`。**`PlacedBlocks` 账本端到端生效。**
+- ✅ **记住**：答 ALLOW_REMEMBER → 动作执行 + 主人 allow 表多一行
+  `1. drop(minecraft:gold_block)`（`rules list` 显示、`.dat` 也落盘）
+- ✅ **拒绝路**：`mode observe` → `没有做 break dirt at 209,2,-154：observe mode: break would change the world`
+
+（日志里 `T lost connection: Internal Exception: java.lang.StackOverflowError` 是 §15.3 已定案的
+**原版关服窗口行为**，与这一阶段无关。）
+
+### 16.5 还没做的
+
+- 征询 UI 仍是聊天按钮（`RUN_COMMAND`），等 `network/` 落地后换回卡片。
+- `GateTerrain`（路径可行性闸）与 `nav/` 其余件仍未搬。
+- 上游 `Interaction` 的 `--sneak`（潜行时「把方块放在箱子上而不是开箱子」）还没接进本仓的 `use_block`。
+
+

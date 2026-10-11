@@ -197,8 +197,15 @@ public record ConsentItem(Action.Kind kind, BlockPos pos, int entityId, String s
             BlockState state = action.state();
             if (state != null && action.kind() != Action.Kind.PLACE) {
                 Item form = state.getBlock().asItem();
-                return new Subject(Registry.BLOCK.getKey(state.getBlock()).getPath(),
-                        form == Items.AIR ? null : form, state.getBlock().getName());
+                // ⚠️ 不要用 Block.getName()：它在**专用服务端**的 jar 里被 ProGuard 裁掉了
+                // （2026-10-11 由 server-api-check.py 抓出来：class_2248.method_9518），
+                // 一渲染征询卡片就 NoSuchMethodError → 整个服务端崩。
+                // 有物品形态就借物品的显示名（同一个名字），没有（水、火这类）就用注册名。
+                String path = Registry.BLOCK.getKey(state.getBlock()).getPath();
+                Component name = form == Items.AIR
+                        ? new TextComponent(path)
+                        : new ItemStack(form).getHoverName();
+                return new Subject(path, form == Items.AIR ? null : form, name);
             }
             if (action.item() != null) {
                 // 1.16.5:Item.getDescription() 在专用服务端被 ProGuard 裁掉(见 PORTING.md),

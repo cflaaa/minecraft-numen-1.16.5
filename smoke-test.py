@@ -140,9 +140,15 @@ def main():
     print("[1/4] 启动专用服务端 …")
     print("=" * 70)
     server_cp = libs + [SERVER_JAR]
-    server_cmd = [JAVA, "-Xmx2G", "-Dfile.encoding=UTF-8",
-                  "-cp", ";".join(server_cp),
-                  "net.fabricmc.loader.impl.launch.knot.KnotServer", "nogui"]
+    server_cmd = [JAVA, "-Xmx2G", "-Dfile.encoding=UTF-8"]
+    # NUMEN_LOG4J=<path> 时用自定义 log4j2 配置（临时诊断用：把
+    # net.minecraft.network.Connection 提到 debug，好让关服时的
+    # StackOverflowError 栈被 LOGGER.debug("Failed to sent packet", cause) 打出来）。
+    if os.environ.get("NUMEN_LOG4J"):
+        server_cmd.append("-Dlog4j.configurationFile=" + os.environ["NUMEN_LOG4J"])
+        server_cmd.append("-Dlog4j2.configurationFile=" + os.environ["NUMEN_LOG4J"])
+    server_cmd += ["-cp", ";".join(server_cp),
+                   "net.fabricmc.loader.impl.launch.knot.KnotServer", "nogui"]
     sf = open(SERVER_OUT, "wb")
     server = subprocess.Popen(server_cmd, cwd=TS, stdin=subprocess.PIPE,
                               stdout=sf, stderr=subprocess.STDOUT)
@@ -202,23 +208,65 @@ def main():
     print("=" * 70)
     print("[3/4] 执行 /execute as %s run numen summon %s" % (PLAYER, COMPANION))
     print("=" * 70)
+    # 权限层全量命令（归位阶段 1）。
+    # ⚠️ mode 的语法是 `mode <同伴名> [ask|bypass|observe]`——模式字面量挂在
+    # **name 参数节点下面**（与上游 NumenCommands 完全一致）。所以：
+    #   `mode Alice`          = 查
+    #   `mode Alice observe`  = 设
+    #   `mode observe`        ✗ 会被当成「名叫 observe 的同伴」，回 yours_not_here
+    #   `mode 张三`           ✗ word() 参数不收中文，Brigadier 解析失败
+    P = "/execute as %s run " % PLAYER
     for cmd in ("/numen list",
-                "/execute as %s run numen summon %s" % (PLAYER, COMPANION),
+                P + "numen summon %s" % COMPANION,
                 "/numen list",
                 "/numen status %s" % COMPANION,
-                # 归位阶段 1：权限层命令树（permission/ 17 个类 + Gate/RuleSet 落地后的接口）
-                "/execute as %s run numen permission mode" % PLAYER,
-                "/execute as %s run numen permission mode owner" % PLAYER,
-                "/execute as %s run numen permission rules list" % PLAYER,
-                "/execute as %s run numen permission rules add deny break(placed & !contents)" % PLAYER,
-                "/execute as %s run numen permission rules list" % PLAYER,
-                "/execute as %s run numen permission rules reset" % PLAYER):
+                # —— 出厂规则全貌 ——
+                P + "numen permission rules list",
+                # —— 模式：查 → 设 observe → 查 → 设 bypass → 查 → 设回 ask → 查 ——
+                P + "numen permission mode %s" % COMPANION,
+                P + "numen permission mode %s observe" % COMPANION,
+                P + "numen permission mode %s" % COMPANION,
+                P + "numen permission mode %s bypass" % COMPANION,
+                P + "numen permission mode %s" % COMPANION,
+                P + "numen permission mode %s ask" % COMPANION,
+                P + "numen permission mode %s" % COMPANION,
+                # —— 规则：加 deny → 加 ask → 列 → 删 deny 1 → 列 ——
+                P + "numen permission rules add deny break(placed & !contents)",
+                P + "numen permission rules add ask drop(*)",
+                P + "numen permission rules list",
+                P + "numen permission rules remove deny 1",
+                P + "numen permission rules list",
+                # —— 错误路径：垃圾规则、越界行号、不存在的同伴 ——
+                P + "numen permission rules add deny 这不是一条规则",
+                P + "numen permission rules remove ask 9",
+                P + "numen permission mode Bob",
+                # —— 收尾：清空三张表 → 列 ——
+                P + "numen permission rules reset",
+                P + "numen permission rules list"):
         print("  >>> " + cmd)
         server.stdin.write((cmd + "\n").encode("utf-8"))
         server.stdin.flush()
-        time.sleep(4)
+        time.sleep(2.5)
 
-    time.sleep(10)
+    # ================= 3b. 落盘测试（NUMEN_PERSIST=1）=================
+    # 目的：验证 PermissionStore / PlacedBlocks 真的写进 SavedData。
+    # 前几轮因为 taskkill /F 强杀，world/data 下没有 numen_*.dat——
+    # 这里设一个非默认值（observe + 一条 allow 规则）、save-all、优雅 stop，
+    # 然后直接把 .dat 打出来看内容。
+    persist = bool(os.environ.get("NUMEN_PERSIST"))
+    if persist:
+        print("=" * 70)
+        print("[3b/4] 落盘测试：设 observe + 加规则 → save-all → 优雅 stop")
+        print("=" * 70)
+        for cmd in (P + "numen permission mode %s observe" % COMPANION,
+                    P + "numen permission rules add allow take(*)",
+                    P + "numen permission rules list"):
+            print("  >>> " + cmd)
+            server.stdin.write((cmd + "\n").encode("utf-8"))
+            server.stdin.flush()
+            time.sleep(2.5)
+
+    time.sleep(5)
 
     # ================= 4. 收结果 =================
     print("=" * 70)
@@ -232,11 +280,38 @@ def main():
 
     tail(SERVER_LOG, 30, "server latest.log")
 
+    # 优雅收服务端：save-all 落盘 → stop 让 SavedData 写入后再退出。
+    if server.poll() is None:
+        print("\n>>> /save-all")
+        server.stdin.write(b"/save-all\n")
+        server.stdin.flush()
+        time.sleep(4)
+        print(">>> /stop")
+        server.stdin.write(b"/stop\n")
+        server.stdin.flush()
+        try:
+            server.wait(timeout=90)
+            print("  ✅ 服务端已优雅退出")
+        except subprocess.TimeoutExpired:
+            print("  !! 服务端 90s 未退出，强杀")
     for p, name in ((client, "客户端"), (server, "服务端")):
         if p.poll() is None:
             subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)],
                            capture_output=True)
     time.sleep(1)
+
+    if persist:
+        data_dir = os.path.join(TS, "world", "data")
+        print("\n---- world/data 下的 numen 存档 ----")
+        found = [f for f in os.listdir(data_dir) if f.startswith("numen")]
+        if not found:
+            print("  !! 没有 numen_*.dat —— SavedData 没落盘")
+        for f in found:
+            raw = open(os.path.join(data_dir, f), "rb").read().decode(
+                "utf-8", "replace")
+            print("  %s (%d 字节):" % (f, len(raw)))
+            print("   ", raw[:400])
+
     print("\n已关闭客户端与服务端")
     return 0
 
