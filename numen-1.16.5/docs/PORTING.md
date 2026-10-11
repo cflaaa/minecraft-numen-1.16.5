@@ -1767,7 +1767,45 @@ tasks.withType(Test).configureEach {
 
 - `nav/` 其余件仍未搬。**`RouteSpec` 目前只有 `defaults()` 一个出口（dig/place 恒 false），所以
   GateTerrain 在真实行走里仍不会被问到**——等挖/垫的路线规格接出来，它才真正上工。
-- 征询 UI 仍是聊天按钮，等 `network/` 落地后换回卡片。
+- 征询 UI 是聊天按钮（`RUN_COMMAND`）——**这是 A 计划的最终形态，不是过渡**：`network/` 不搬
+  （见 §17.7），所以没有「等 network/ 落地后换回卡片」这回事。
 - 上游 `Interaction` 的 `--sneak`（潜行时「把方块放在箱子上而不是开箱子」）还没接进本仓的 `use_block`。
+
+### 17.7 部署目标：A 计划 + 外接大脑（2026-10-11 定）
+
+**为什么定这个**：目标是**多人联机服务器**。三种形态比下来（下面每条事实都在代码里核过）：
+
+| | 原版（客户端大脑） | A 计划 · 内置大脑 | A 计划 · 外接大脑 |
+|---|---|---|---|
+| 玩家要装 mod 吗 | 要（含 `program/`） | 不要 | 不要 |
+| API key 在哪 | 每个玩家自己 | 服务端 `config/numen.json` | 外部 agent，服务端不存 |
+| AI 算力在哪 | 玩家机器 | 服务端主线程 | Minecraft 之外 |
+| 多人服适配 | 不适合 | 可以 | 最合适 |
+
+依据：
+
+- **核心全在服务端**：同伴是服务端假玩家、大脑在服务端、征询走聊天；客户端只剩 G 面板 +
+  离线账号解禁。`fabric.mod.json` 里**没有 `custom` 载荷要求** → **vanilla 客户端能连**。
+- `config/numen.json` 是**服务端全局配置，里面就是 API key**——`NumenClientPrefs` 的注释写明了
+  这一点（客户端那份只是 UI 偏好，另存 `config/numen_client.txt`）。
+- 外接大脑：`core/mcp/` 的 HTTP 服务端（JDK `HttpServer`）**跑在 MC 服务端里**，真正的 LLM 循环在外；
+  外脑驱动期间内置大脑停牌（`McpMode.driving()`）。→ 服务端不存 key、不扛推理算力。
+- 权限层（`Gate` / `PermissionStore` / `PlacedBlocks`）全在服务端、按「(主人, 同伴)」记账 → 服主集中管。
+
+**⚠️ 因此多出一个优先项（尚未做）**：`program/ProgramLimits` 管的是**并发数与每刻主线程预算**
+（上游：每位主人 8 段 / 全服 64 段 / 每刻 10ms·5ms）。A 计划不搬 `program/`，**这套闸也就没有了**。
+而内置大脑是**跑在服务端主线程**上的——`CompanionBrain` 的注释原话：
+
+> 引擎层是纯 JVM、单线程假设：`AgentLoop` 的所有状态只在一个线程上读写。
+> 在 Minecraft 里那个线程就是**服务端主线程**。
+
+HTTP 走 `HttpClient.sendAsync`（异步，网络等待不占主线程），但**每轮的 JSON 解析、工具派发、
+Lua 脚本执行都在主线程**。单人服无感，10 个玩家各带一个同伴同时说话就会开始掉刻。
+外接大脑能绕开大半（ReAct 循环在服外），但工具执行仍在主线程。
+→ 要做多人服，**「每刻主线程预算 + 并发上限」应当优先补**：不一定要照搬 `program/`，但这条闸要有。
+
+**同时纠正一句旧描述**：`fabric.mod.json` 的 `description` 与 `README.md` 开头原本写着上游那句
+「推理在你本机发起，用你自己的 API key」——那是**客户端大脑**时代的说法，与 A 计划正好相反
+（会让服主以为玩家自带 key、服务端不用配）。两处都已改成 A 计划的说法。
 
 

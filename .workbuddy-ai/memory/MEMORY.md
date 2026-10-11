@@ -37,6 +37,26 @@
 - MCP 外接大脑：`core/mcp/`，10 个工具，`/numen tell` 是唯一说话通道；`mcp-drive.py` 驱动。
 - 默认 API 预设 NVIDIA NIM；「获取模型」= `ModelCatalog` + `ModelCatalogState`（异步结果必须进轮询快照，不能只回一条消息）。
 
+### 部署目标（2026-10-11 定）
+
+**A 计划 + 外接大脑**（面向**多人联机服务器**）。依据（都在代码里核过）：
+
+- 核心全在服务端（同伴=服务端假玩家、大脑在服务端、征询走聊天），`fabric.mod.json` **无 `custom` 载荷**
+  → **vanilla 客户端能连、玩家不用装 mod**（客户端只剩 G 面板 + 离线账号解禁）。
+- `config/numen.json` 是**服务端全局配置，里面就是 API key**（`NumenClientPrefs` 注释明说；客户端那份
+  只存 UI 偏好，另存 `config/numen_client.txt`）。
+- 外接大脑：`core/mcp/` 的 HTTP 服务端（JDK `HttpServer`）**在 MC 服务端里**，LLM 循环在**服外**；
+  外脑驱动期间内置大脑停牌（`McpMode.driving()`）→ 服务端不存 key、不扛推理算力。
+- 权限层（Gate/PermissionStore/PlacedBlocks）全在服务端、按 (主人, 同伴) 记账 → 服主集中管。
+
+⚠️ **优先项（未做）**：`program/ProgramLimits`（并发数 + **每刻主线程预算**：每位主人 8 段 / 全服 64 段 /
+每刻 10ms·5ms）**没搬**，而内置大脑跑在**服务端主线程**（`CompanionBrain` 注释：「`AgentLoop` 的所有
+状态只在一个线程上读写，在 Minecraft 里那个线程就是服务端主线程」；HTTP 是 `sendAsync` 不占主线程，
+但 JSON 解析 / 工具派发 / Lua 执行都在主线程）→ 多人多同伴会掉刻。**做多人服必须先补这条闸。**
+
+由于选了外接大脑，`program/`、`network/`、客户端大脑**永久不在归位范围内**——不是欠账，是这套架构
+有意不要的一层（RESTORE_PLAN.md 的「🔴 要你拍板」已标为 ✅ 已拍板）。详见 PORTING.md §17.7。
+
 ### 环境坑
 
 - 本机 `http_proxy` 会代理 localhost → Python 用 `ProxyHandler({})`，curl 用 `--noproxy '*'`。

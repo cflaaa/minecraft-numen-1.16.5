@@ -3,7 +3,7 @@
     "id": "numen",
     "version": "0.1.4-1.16.5",
     "name": "Numen (1.16.5 port)",
-    "description": "LLM-powered AI companions, backported to Minecraft 1.16.5. Summon a companion (a server-side fake player) and talk to it in natural language; the agent runs on your own machine with your own API key. Unofficial port of https://github.com/Dwinovo/minecraft-numen",
+    "description": "LLM-powered AI companions for Minecraft 1.16.5. Summon a companion (a server-side fake player) and talk to it in natural language. The agent runs on the server: either the built-in brain (provider and API key in config/numen.json), or an external agent driving it over the built-in MCP server. Players need no client mod. Unofficial port of https://github.com/Dwinovo/minecraft-numen",
     "authors": [
         "dwinovo",
         "1.16.5 port"
