@@ -65,8 +65,22 @@ dependencies {
 }
 
 // JUnit 5 平台。bisect 期间曾冤枉过它：丢 pathing 类的真凶是跨项目共享 remapper（见文末）。
+//
+// ⚠️ 测试运行期必须**先挂 named 的 pathing 类**（2026-10-11 归位阶段 2 实测）：
+// `implementation project(':pathing')` 在 testRuntimeClasspath 上解析到的是 pathing 的
+// **remapJar**（intermediary 名，如 `TerrainPolicy$Change$Place.<init>(class_2248)`），
+// 而测试编译用的是 named（`<init>(net.minecraft.world.level.block.Block)`）。两套命名一混，
+// 凡在测试里直接 `new` 一个**带 MC 类型描述的 pathing 类型**（如 `new Change.Place(Blocks.DIRT)`）
+// 就在运行期 NoSuchMethodError——此前 core 的测试只碰 core 自己的类，没踩到。
+// 把 named 的 classes 目录插到最前，让它盖过那个 remapJar（JVM 取先找到的那个）。
+// 用 doFirst 而不是配置期求值：build.gradle 文末那条坑说过，配置期碰 `project(':pathing')`
+// 会干扰 Loom，执行期才碰就没事。
 tasks.withType(Test).configureEach {
     useJUnitPlatform()
+    dependsOn ':pathing:classes'
+    doFirst {
+        classpath = files(project(':pathing').sourceSets.main.output) + classpath
+    }
 }
 
 

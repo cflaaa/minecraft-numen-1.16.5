@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.dwinovo.numen.core.permission.Permission;
 import com.dwinovo.numen.pathing.api.Navigator;
 import com.dwinovo.numen.pathing.api.Ports;
 import com.dwinovo.numen.pathing.plan.Materials;
@@ -24,11 +25,11 @@ import net.minecraft.world.phys.AABB;
 /**
  * 同伴接入寻路的端口，只在这里组：她的身体、她的两只手、此刻的地形许可、这一趟愿意垫的料、附近要避开的生物。
  *
- * <p>与上游 {@code core/common/.../nav/CompanionPorts.java} 的分工相同，但**这一版少了权限层**：
- * 上游的手外面套着 {@code Gate}（挖/放之前先问主人许不许），本仓还没有权限系统。
- * 缺的那一层是「安全阀」，不是「能不能走路」——没有它，寻路照走，只是动手前不请示。
+ * <p>与上游 {@code core/common/.../nav/CompanionPorts.java} 的分工相同，权限层也已就位：地形许可是
+ * {@link GateTerrain}（挖/放之前先问主人许不许，见 {@link Permission}）。归位阶段 2 补上（2026-10-11）：
+ * 此前这里全放行，寻路照走、动手前不请示。
  *
- * <p>只在世界所在的线程上调用：威胁与垫路料都在这一刻现取。
+ * <p>只在世界所在的线程上调用：权限快照、威胁与垫路料都在这一刻现取。
  */
 public final class CompanionPorts {
 
@@ -40,21 +41,24 @@ public final class CompanionPorts {
 
     private CompanionPorts() {}
 
-    /** 她的寻路门面：手是她的两只手，垫路料从她背包里挑，威胁由调用方给。 */
+    /** 她的寻路门面：手是她的两只手，此刻的权限快照，垫路料从她背包里挑，威胁由调用方给。 */
     public static Navigator navigator(NumenPlayer player, Threats threats) {
-        return Navigator.of(player, new Ports(player.hands(), TERRAIN, materials(player), threats));
+        return Navigator.of(player, new Ports(player.hands(), terrain(player), materials(player), threats));
     }
 
     /**
-     * 地形许可（宿主对「挖这一格 / 放这一格」的额外否决权）。
+     * 地形许可（宿主对「挖这一格 / 放这一格」的额外否决权）：权限层的一份裁决快照。
      *
-     * <p>上游这里是 {@code GateTerrain}，按权限快照逐格裁决；本仓还没有权限系统，所以先全放行。
+     * <p>上游这里是 {@code new GateTerrain(Permission.gateFor(player))}，本仓同样。快照在主线程取
+     * （{@link #navigator} 只在世界所在的线程上调），之后搜索线程只读它逐格问。
      *
-     * <p>⚠️ <b>全放行不等于「随便挖」</b>：真正决定这一趟挖不挖、放不放的是<b>路线规格</b>
+     * <p>⚠️ <b>它不等于「随便挖」</b>：真正决定这一趟挖不挖、放不放的是<b>路线规格</b>
      * （{@code RouteSpec} 的 {@code dig} / {@code place}），这里只是宿主在此之上再加一道否决。
      * 规格说不动地形，寻路就一格都不会动。
      */
-    private static final TerrainPolicy TERRAIN = TerrainPolicy.ALLOW_ALL;
+    private static TerrainPolicy terrain(NumenPlayer player) {
+        return new GateTerrain(Permission.gateFor(player));
+    }
 
     /**
      * 她附近此刻要避开的敌对生物。寻路把它们变成按位置的代价，绕开走。

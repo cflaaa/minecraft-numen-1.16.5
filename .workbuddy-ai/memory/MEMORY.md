@@ -10,7 +10,7 @@
 
 - 工具链在工作区根：`JAVA_HOME=.toolchain/jdk-17.0.20.1+1` + `.toolchain/gradle-7.6.4/bin/gradle :core:build`。Java 17 + 官方 Mojang 映射（勿改 Yarn）。
 - `maven.fabricmc.net` 是抖动不是被墙：aliyun 仓库排最前，报 `Could not download` 就重跑。
-- ⚠️ 发行 jar 丢 pathing 类已定案（2026-10-11）：真凶是 **loom 0.12 跨项目共享 TinyRemapperService**（服务 id 不含项目路径）——core 平铺的 pathing 类与 compileClasspath 上的 pathing dev jar 被两个 prepareRemapJar 并发各读一次 input，duplicate-input 去重后 InputTag 归属不稳，core 的 apply(tag) 把 pathing 类筛光。**已修**：core 与 pathing 的 build.gradle 都加 `remapperIsolation.set(true)`。保险起见改完 pathing 仍要 clean 重建并数类（应 243 个，总类 339）。pathing 平铺写法定死不变：`dependsOn ':pathing:classes'` 字符串惰性 + `from({ ... })` 闭包。
+- ⚠️ 发行 jar 丢 pathing 类已定案（2026-10-11）：真凶是 **loom 0.12 跨项目共享 TinyRemapperService**（服务 id 不含项目路径）——core 平铺的 pathing 类与 compileClasspath 上的 pathing dev jar 被两个 prepareRemapJar 并发各读一次 input，duplicate-input 去重后 InputTag 归属不稳，core 的 apply(tag) 把 pathing 类筛光。**已修**：core 与 pathing 的 build.gradle 都加 `remapperIsolation.set(true)`。保险起见改完 pathing 仍要 clean 重建，并**把 jar 里的类名集合与 `pathing/build/classes`+`core/build/classes` 逐个比对**（2026-10-11 实测 346 = pathing 235 + core 111，无缺无多；别记死数字，会随代码变）。pathing 平铺写法定死不变：`dependsOn ':pathing:classes'` 字符串惰性 + `from({ ... })` 闭包。
 
 ### 硬约束（详见 docs/PORTING.md）
 
@@ -22,6 +22,9 @@
 - ⚠️ **mixin 配置的 `package` 是独占的**：`package` 指到的包下面**只许有 mixin 类**，否则宿主类一加载就 `IllegalClassLoadError: … is in a defined mixin package`，**服务端起不来**。
 - ⚠️ **原版不许把方块放进玩家自己身体里**（`CollisionGetter.isUnobstructed` 把 `null` 当「谁放的」，不排除放置者）。写测试/脚本时别点同伴**脚下**那一格：`placeAt = hit.getBlockPos().relative(hit.getDirection())` 只要等于她自己那一格，`BlockItem.place` 必返 `FAIL`。详见 PORTING.md §16.3。
 - 本机探针脚本取坐标一律 `math.floor`，**别用 `int()`**（截断，负坐标偏一格 → 会白跑几轮对照）。
+- ⚠️ **core 的单元测试跨到 pathing 且带 MC 类型时会 `NoSuchMethodError`**：`testRuntimeClasspath` 上 `implementation project(':pathing')` 解析到的是 pathing 的 **remapJar（intermediary，`class_2248`）**，而编译期是 **named**（`net.minecraft.world.level.block.Block`）。已在 `core/build.gradle` 给 `Test` 任务加 `doFirst { classpath = files(project(':pathing').sourceSets.main.output) + classpath }` 兜底（Loom 0.12.5 无 `namedElements`）。新写这类测试别以为是自己的错。详见 PORTING.md §17.4。
+- ⚠️ **`GateTerrain` 平时碰不到**：`RouteSpec.defaults()` 是 `dig=false/place=false`，而 `CostModel.admitDig/admitPlace` 在 `!spec.dig()` 时**直接早退**，不问 `TerrainPolicy`。只有搜索失败时 `Diagnosis.exhausted` 用 `spec.edit().changes(true)` 再搜一次才逐格问它（诊断只报不执行）。详见 PORTING.md §17.2。
+- ⚠️ **真机用「埋目标」逼出挖/垫路径时，三件事必须先确认**：①场地**密闭**（否则可达格无限 → 搜索 `停因 BUDGET` → `Diagnosis.of` 直接 `OutOfBudget` 早退，GateTerrain 白测）；②`/fill` 在**世界高度内**（1.16.5 主世界 0..255，越界**静默失败**）；③目标埋在**脚下**（向下挖不用给脑袋留空间）。搭完用 `/execute if block …` 自检场地。详见 PORTING.md §17.3。
 
 ### 已落地大件
 
@@ -29,7 +32,8 @@
 - **归位阶段 2（2026-10-11）：Gate 接进 `mine`/`use_block`/`drop`**——ASK 时把这次调用**停在原地**发征询、答复后带回同一次调用重跑；Lua 的 `numen.inv.drop`/`numen.use.block` 同步过闸（ASK 抛 `NEEDS_CONSENT`，失败方向是关）；放置账本 mixin `BlockItemPlaceMixin` → `PlacedBlocks`。**真机 5/5 全通过**（放行/要问/放置账本/记住/拒绝），见 PORTING.md §16。
 - 离线多人修复：`core/client/NumenOfflineMultiplayer` + mixin（PORTING.md §8）。
 - G 面板：自绘界面，热区靠绘制时记 `hits`；布局验证用 `-Dnumen.panel=...` + `verify-panel.py`。
-- pathing 寻路：55 条编译差异全修完（§10.1 对照表）；`Sight.march` 是手搬 DDA，改动须重跑 20000 射线比对；已真机跑通（绕坑验证）。⏭ 未做：`GateTerrain`（路径可行性闸，已随 permission/ 落地的是行为许可 Gate，两回事）、`nav/` 其余件；默认 `dig=false place=false`。
+- **归位阶段 2 收尾（2026-10-11）：`GateTerrain` 接进寻路**——新增 `core/nav/GateTerrain.java`（`record GateTerrain(Gate) implements TerrainPolicy`，照上游搬），`CompanionPorts` 的 `TERRAIN=ALLOW_ALL` 换成 `new GateTerrain(Permission.gateFor(player))`；新增 `GateTerrainTest` 5 条，`core:test` 60 条全绿。真机 A/B/C 全过（A 不加规则=「要改 3 格地形」/ B `deny break(minecraft:stone)`=「按现在的方式走不过去」**决定性** / C 去掉规则又回到 A），见 PORTING.md §17。⚠️ 但 `RouteSpec` 目前只有 `defaults()` 一个出口，**真实行走里仍不会问到它**——等挖/垫的路线规格接出来才真正上工。
+- pathing 寻路：55 条编译差异全修完（§10.1 对照表）；`Sight.march` 是手搬 DDA，改动须重跑 20000 射线比对；已真机跑通（绕坑验证）。⏭ 未做：`nav/` 其余件；默认 `dig=false place=false`。
 - MCP 外接大脑：`core/mcp/`，10 个工具，`/numen tell` 是唯一说话通道；`mcp-drive.py` 驱动。
 - 默认 API 预设 NVIDIA NIM；「获取模型」= `ModelCatalog` + `ModelCatalogState`（异步结果必须进轮询快照，不能只回一条消息）。
 

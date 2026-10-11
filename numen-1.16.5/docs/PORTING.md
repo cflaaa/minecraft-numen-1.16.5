@@ -1670,7 +1670,104 @@ default boolean isUnobstructed(BlockState state, BlockPos pos, CollisionContext 
 ### 16.5 还没做的
 
 - 征询 UI 仍是聊天按钮（`RUN_COMMAND`），等 `network/` 落地后换回卡片。
-- `GateTerrain`（路径可行性闸）与 `nav/` 其余件仍未搬。
+- `GateTerrain`（路径可行性闸）——**已完成，见 §17**。
+- 上游 `Interaction` 的 `--sneak`（潜行时「把方块放在箱子上而不是开箱子」）还没接进本仓的 `use_block`。
+
+## 十七、归位阶段 2 收尾：`GateTerrain` 接进寻路（2026-10-11）
+
+### 17.1 这一刀做了什么
+
+- 新增 `core/nav/GateTerrain.java`（照上游 `core/common/.../nav/GateTerrain.java` 逐字搬，仅改包名）：
+  `record GateTerrain(Gate gate) implements TerrainPolicy`。放行 → `Permit.ALLOW`；要问 →
+  `Permit.ask(gate.consentItem(action, verdict, view))`；拒绝 → `Permit.deny(verdict)`。
+  挖 = `Action.breakBlock`；放 = `Action.place`，水方块没有物品形态，倒水按水桶算
+  （`Blocks.WATER → Items.WATER_BUCKET`）。1.16.5 无需适配（`Block.asItem()` 这一代就有，javap 核过）。
+- `nav/CompanionPorts`：删掉 `TERRAIN = TerrainPolicy.ALLOW_ALL` 常量，换成
+  `terrain(player) = new GateTerrain(Permission.gateFor(player))`；那句「本仓还没有权限系统」的过期注释改掉。
+  快照在主线程取（`navigator` 只在世界所在的线程上调），之后搜索线程只读。
+- 新增 `core/src/test/.../nav/GateTerrainTest.java`（照上游搬，5 条）：天然方块放行 / 箱子要问且凭据说明原因 /
+  玩家放过的泥土要问 / 出厂门标签那一行生效 / 往空气里放放行。
+
+### 17.2 ⚠️ `GateTerrain` 平时**碰不到**——真机怎么把它问出来
+
+`CompanionNav.to` 用的是 `RouteSpec.defaults()`：dig=false / place=false / consent=true。
+`CostModel.admitDig` / `admitPlace` 在 `!spec.dig()`（`!spec.place()`）时**直接早退**，根本不问 `TerrainPolicy`。
+**所以平时走路一次都不会问到 GateTerrain。**
+
+只有「搜索没交出路」时，`Navigation.conclude` 才把这次失败交给 `Diagnosis`；`Diagnosis.exhausted`
+会用 `spec.edit().changes(true)`（许挖许放）**再搜一次**——那一次才逐格问 GateTerrain。
+诊断只报不执行（`Navigation.tick` 里 `diagnosis.poll()` 的结论只变成 `NavStatus.failed`），世界不会被改。
+
+据此设计真机验证（`.workbuddy-ai/tmp/nav-gate-e2e.py`）：把她 tp 进一个**密闭**石头小室，目标埋在她
+脚下的石头里，制造「不改地形就到不了」的局面：
+
+| 步 | 条件 | 期望 | 实测 |
+| --- | --- | --- | --- |
+| A | 不加规则 | 诊断许挖重搜 → GateTerrain 对天然石头答 ALLOW → 找得到路 → **NeedsChanges** | ✅「要改 3 格地形（挖开或垫上）才过得去」 |
+| B | `deny break(minecraft:stone)` | GateTerrain 答 DENY → 找不着路 → **NoRoute** | ✅「按现在的方式走不过去（不挖不垫的话绕不过去）」 |
+| C | 去掉规则 | 又回到 A | ✅ 又回到「要改 3 格地形…」 |
+
+**B 是决定性的**：`ALLOW_ALL` 永远答 ALLOW，绝不可能出现 `NoRoute`。日志里那次
+
+```
+结局 NeedsChanges[changes=[Dig[pos=…{x=223, y=59, z=-153}, state=Block{minecraft:stone}, permit=Allow[], …],
+                            Dig[… y=58 …, permit=Allow[]], Dig[… y=57 …, permit=Allow[]]]]
+```
+
+更是直接写着「这 3 格挖是 GateTerrain 放行的」。另外先跑了一趟普通走路 → `Arrived[]`（3 步），
+证明 `CompanionPorts` 每次取 `gateFor` 快照没把寻路弄坏。
+
+### 17.3 ⚠️ 真机验证踩的两个坑（都是测试脚本的，不是产品的）
+
+1. **目标埋在开阔地下的石头里 → 两次搜索都 `停因 BUDGET`。** 地面开阔、可达格无限，A* 搜到全局
+   预算耗尽也没结论；而 `Diagnosis.of` 见 BUDGET **直接 `OutOfBudget` 早退**
+   （`case BUDGET -> new Outcome.OutOfBudget()`），**走不到**「许挖再搜」那一步 —— GateTerrain
+   一次都没被问过，等于白测。**必须把场地密闭**，让搜索穷尽（`EXHAUSTED`）才进 diagnosis。
+2. **`/fill` 越界会静默失败。** 1.16.5 主世界高度是 **0..255**；第一版从她脚下的 y=4 往下填到 y=-2，
+   整条 `/fill` 报错没生效，她其实还站在开阔地上（所以还是 BUDGET）。改到固定高度（y=60）悬空搭盒子
+   再 tp 进去。顺手加 `/execute if block …` 自检，别让「场地没搭成」冒充成「产品结论」。
+
+> **移植提醒**：用「埋目标」逼出挖/垫路径时，先确认三件事——**场地密闭**、**`/fill` 在世界高度内**、
+> **目标埋在脚下**（向下挖不用给脑袋留空间，横着挖穿 2 格高的墙还得再挖头顶那一格）。
+
+### 17.4 ⚠️ 测试运行期拿到的是 pathing 的 **remapJar**（intermediary），编译期是 named
+
+新增的 `GateTerrainTest` 一上来就
+
+```
+java.lang.NoSuchMethodError: 'void com.dwinovo.numen.pathing.plan.TerrainPolicy$Change$Place.<init>(net.minecraft.world.level.block.Block)'
+```
+
+原因：`core:compileTestJava` 对着 **named** 的 pathing 编译（`<init>(net.minecraft.world.level.block.Block)`），
+而 `core:testRuntimeClasspath` 上 `implementation project(':pathing')` 解析到的却是 pathing 的 **remapJar**
+（intermediary：`<init>(net.minecraft.class_2248)`）。两套命名一混，凡在测试里直接 `new` 一个
+**带 MC 类型描述的 pathing 类型**就炸。此前 core 的测试只碰 core 自己的类，所以一直没暴露。
+
+修法（`core/build.gradle`）：给 `Test` 任务把 **named** 的 pathing 输出插到 classpath **最前**，盖过那个
+remapJar；用 `doFirst` 而不是配置期求值（配置期碰 `project(':pathing')` 会干扰 Loom，见 §14.5 与文末）。
+
+```groovy
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    dependsOn ':pathing:classes'
+    doFirst { classpath = files(project(':pathing').sourceSets.main.output) + classpath }
+}
+```
+
+（Loom 0.12.5 **没有** `namedElements` 配置，所以走这条路。）
+
+### 17.5 验证与产物
+
+- 单元测试：`core:test` **60 条全绿**（原 55 + `GateTerrainTest` 5）。
+- 发行 jar：`Numen-fabric-1.16.5-0.1.4-1.16.5.jar`，**346 个类 = pathing 235 + core 111**；
+  与 `pathing/build/classes` + `core/build/classes` 的类名集合**逐个比对无缺无多**。
+- 真机：`nav-gate-e2e.py` A/B/C 全过（见 17.2）。
+
+### 17.6 还没做的
+
+- `nav/` 其余件仍未搬。**`RouteSpec` 目前只有 `defaults()` 一个出口（dig/place 恒 false），所以
+  GateTerrain 在真实行走里仍不会被问到**——等挖/垫的路线规格接出来，它才真正上工。
+- 征询 UI 仍是聊天按钮，等 `network/` 落地后换回卡片。
 - 上游 `Interaction` 的 `--sneak`（潜行时「把方块放在箱子上而不是开箱子」）还没接进本仓的 `use_block`。
 
 
