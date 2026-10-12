@@ -10,6 +10,7 @@ import com.mojang.authlib.GameProfile;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -17,6 +18,7 @@ import net.minecraft.server.level.ServerPlayerGameMode;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
 
 import java.util.UUID;
 
@@ -50,6 +52,13 @@ public final class NumenPlayer extends ServerPlayer implements Body {
 
     /** 这具身体的死亡已经处理过了，保证善后只跑一次。 */
     private boolean deathHandled;
+
+    /**
+     * 上一次 tick 见到的维度；变了就是穿过了传送门。出生时置 null，头一 tick 只记账不播报。
+     * 上游挂 Fabric 的 {@code AFTER_PLAYER_CHANGE_WORLD}，1.16.5 没有那个事件，改为实体
+     * tick 里比对（和既有的 poll 一套路子）。
+     */
+    private ResourceKey<Level> lastDimension;
 
     /** 她的键盘：谁要让身体走、跳、潜行都按它，{@link Physics#step} 每刻落一次。 */
     private final Controls controls = new Controls();
@@ -455,13 +464,19 @@ public final class NumenPlayer extends ServerPlayer implements Body {
             reportTickFailure(ex);
         }
 
-        // 征询登记处的每刻检查（主人下线/到点按拒绝收尾）。上游挂在 CompanionTickDispatcher
-        // （任务调度内核，阶段 2 归位）里每刻对所有在场同伴调一遍；在那之前先跟着身体的 tick 走，
-        // 反正登记处本身也挂在身体上（state），同一原则：跟着身体走，不进静态表。
-        try {
-            com.dwinovo.numen.core.permission.ConsentDesk.of(this).tick();
-        } catch (RuntimeException ex) {
-            reportTickFailure(ex);
+        // 穿过了传送门（ upstream 挂 ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD，
+        // 1.16.5 的 Fabric API 没有这个事件）——和本仓既有的 poll 同一套路：眼见为实，
+        // 每次 tick 比一次维度，变了就是过了门。
+        ResourceKey<Level> dim = level.dimension();
+        if (lastDimension == null) {
+            lastDimension = dim;   // 首次进世界不算「进入」：出生不该播报
+        } else if (!dim.equals(lastDimension)) {
+            lastDimension = dim;
+            try {
+                Companions.onDimensionChanged(this);
+            } catch (RuntimeException ex) {
+                reportTickFailure(ex);
+            }
         }
     }
 

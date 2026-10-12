@@ -1,5 +1,6 @@
 package com.dwinovo.numen.core.entity;
 
+import com.dwinovo.numen.core.api.CompanionEvent;
 import com.mojang.authlib.GameProfile;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -59,11 +60,19 @@ public final class CompanionFactory {
 
         // 皮肤覆盖层是同步实体数据、不随存档存取，每次进世界都要重设。
         body.showAllSkinLayers();
+        // 身体齐了、进了玩家列表，插件此刻可以对它下命令（改外观、发指令都需要它在列表里）。
+        // 排程器也靠这一声接手重启前落盘的活（CompanionTickDispatcher.onCompanionSpawned）。
+        CompanionEvents.fire(CompanionEvent.SPAWN, body);
         return body;
     }
 
     /** 把同伴移出世界。走玩家列表，与真玩家登出同一条路径。 */
     public static void despawn(MinecraftServer server, ServerPlayer body) {
+        // 告诉各工具包身体要走了，让它们收掉自己那份按同伴记的活（比如挖掘的裂痕贴图），
+        // 不然身体掉出 tick 循环的玩家列表之后就没人再收尾。排程器同样靠这一声终局当前任务。
+        if (body instanceof NumenPlayer companion) {
+            CompanionEvents.fire(CompanionEvent.REMOVE, companion);
+        }
         server.getPlayerList().remove(body);
     }
 }

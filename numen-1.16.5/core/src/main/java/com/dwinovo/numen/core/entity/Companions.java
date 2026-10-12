@@ -3,11 +3,13 @@ package com.dwinovo.numen.core.entity;
 import com.dwinovo.numen.agent.inbox.EventQueue;
 import com.dwinovo.numen.core.NumenCore;
 import com.dwinovo.numen.core.agent.CompanionBrain;
+import com.dwinovo.numen.core.api.CompanionEvent;
 import com.dwinovo.numen.core.api.NumenPlugins;
 import com.dwinovo.numen.core.api.gear.GearSlot;
 import com.dwinovo.numen.core.data.ModLanguageData;
 import com.dwinovo.numen.core.network.NumenNetwork;
 import com.dwinovo.numen.core.network.payload.CompanionListPayload;
+import com.dwinovo.numen.core.network.payload.NumenDeathPayload;
 import com.dwinovo.numen.core.network.payload.NumenEventPayload;
 import com.dwinovo.numen.core.network.payload.NumenRespawnPayload;
 import com.dwinovo.numen.core.event.NumenEvents;
@@ -251,27 +253,68 @@ public final class Companions {
     // ---- 死亡善后 ----
 
     /**
-     * 同伴死了。
+     * 她刚死了（在 {@link NumenPlayer#tick} 里检测到）。死亡本身完全交给原版——掉落、
+     * 墓碑模组、keepInventory 都照常生效，因为这是一次真的 ServerPlayer 死亡。
+     * 我们只做四件事：把死讯发给主人（他的循环据此停牌 DEAD）、触发生命周期钩子
+     * （排程器丢活）、把死亡记进世界存档的注册表（5 秒后回主人身边）、把尸体在这 tick 之后收掉。
      *
-     * <p>假玩家不会被自动移出玩家列表（没有客户端来发重生包），会永远躺在 0 血，
-     * 所以必须由我们接手：先停大脑，再<b>在原位重生</b>。
+     * <p>顺序要紧：先发死讯再触发点——死讯一到，客户端的循环就停牌 DEAD；此后钩子里产生的
+     * 收尾事件（异步任务的 task_finished status="interrupted"）照样进队列，但不开 run，
+     * 安静躺到复活。反过来的话，那条 urgent 收尾事件会在停牌之前到达、当场开一轮，而紧接着
+     * 的死讯又把那一轮整个作废——白烧一次请求，还多一条没人看的对话。
      *
-     * <p>上游的做法是排一个延迟、把身体放回主人身边；这里先做最简单也最不惊悚的一种：
-     * 原地复活并回满血。把「重生到主人身边 + 播报死因」留到后续阶段。
+     * <p>1.16.5 适配：{@code body.level()} → {@code body.level} 字段。
      */
     public static void onDeath(NumenPlayer body) {
-        CompanionBrain brain = BRAINS.get(body.getUUID());
-        if (brain != null) {
-            brain.halt("身体死亡");
+        MinecraftServer server = body.level.getServer();
+        if (server == null) {
+            return;
         }
+        UUID uuid = body.getUUID();
+        // 死因取 die() 里抄下的那一句：此刻再问战斗记录已经被 vanilla 清空了，
+        // 只会拿到「她死了」这种没有凶手的兜底文案（见 NumenPlayer#deathMessage）。
+        String cause = body.deathMessage();
+        if (cause == null || cause.isBlank()) {
+            cause = body.getCombatTracker().getDeathMessage().getString();
+        }
+        if (cause == null || cause.isBlank()) {
+            cause = "未知原因";
+        }
+        ServerPlayer owner = body.resolveOwnerPlayer();
+        if (owner != null) {   // immediate, same-session
+            NumenNetwork.sendToPlayer(owner, new NumenDeathPayload(uuid, cause));
+        }
+        CompanionEvents.fire(CompanionEvent.DEATH, body);   // 不发工具结果：那条 tool_call 已由死因结算
+        // 共存期：旧大脑（本仓自写子集）也停掉——它由 Companions.tick 驱着，不停会继续
+        // 拿一具即将离场的身体跑工具。刀 3 删 Acts/NumenTools 时这一并去掉。
+        CompanionBrain oldBrain = BRAINS.get(uuid);
+        if (oldBrain != null) {
+            oldBrain.halt("身体死亡");
+        }
+        // 把死亡（死因 + 游戏时刻）落进世界存档的注册表：撑得过复活窗口里的一次登出——
+        // 没有它，重登就丢了待复活状态，身体会「活着」回来，背包空空，也不知道自己死过。
+        CompanionRegistry.get(server).markDead(uuid, cause, server.overworld().getGameTime());
+        // 死亡状态进了注册表，名册才说得出「她还在，只是躺着」——面板的倒计时读这个。
+        // 少了这一推，主人在死亡窗口里重登就会看见她凭空消失。
+        if (owner != null) {
+            syncRosterToOwner(server, owner);
+        }
+        body.setHealth(body.getMaxHealth());             // 存下的 .dat 是一具健康的身体，留给复活
+        server.execute(() -> CompanionFactory.despawn(server, body));   // 尸体在这 tick 之后安全收掉
+    }
 
-        String why = body.deathMessage();
-        NumenCore.info("同伴 {} 死亡：{}", body.getGameProfile().getName(),
-                why == null ? "(未知)" : why);
-
-        // 原地复活：这一代假玩家没有客户端，不会自己重生。
-        // 细节与三个必须一起做的动作见 NumenPlayer#revive。
-        body.revive();
+    /**
+     * 她一个人穿过了传送门——告诉她一声（环境事件，急不得）。
+     *
+     * <p>上游挂 Fabric 的 {@code AFTER_PLAYER_CHANGE_WORLD}；1.16.5 的 Fabric API 没有这个事件，
+     * 改由 {@link NumenPlayer#tick} 里比对维度发现（见那边的 lastDimension）。
+     */
+    public static void onDimensionChanged(NumenPlayer body) {
+        String dim = body.level.dimension().location().toString();
+        com.dwinovo.numen.core.event.NumenEvents.emit(body,
+                EventTypes.DIMENSION_CHANGE,
+                java.util.Map.of("to", dim),
+                "你进入了 " + dim + "。留意这个维度的环境和危险。", false);
     }
 
     /** 预留：死亡延迟重生的窗口长度，后续阶段接上「放回主人身边」时用。 */

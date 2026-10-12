@@ -1,16 +1,29 @@
 package com.dwinovo.numen.core;
 
+import com.dwinovo.numen.core.api.CompanionEvent;
+import com.dwinovo.numen.core.api.NumenPlugins;
 import com.dwinovo.numen.core.command.NumenCommand;
 import com.dwinovo.numen.core.config.NumenConfig;
+import com.dwinovo.numen.core.entity.CompanionEvents;
 import com.dwinovo.numen.core.entity.Companions;
 import com.dwinovo.numen.core.mcp.McpActuator;
 import com.dwinovo.numen.core.mcp.McpConfig;
 import com.dwinovo.numen.core.mcp.McpMode;
 import com.dwinovo.numen.core.net.NumenPanelServer;
+import com.dwinovo.numen.core.network.NumenNetwork;
+import com.dwinovo.numen.core.platform.ServerLifecycle;
+import com.dwinovo.numen.core.program.ServerPrograms;
+import com.dwinovo.numen.core.script.ModuleApi;
+import com.dwinovo.numen.core.sdk.HelpApi;
+import com.dwinovo.numen.core.task.CompanionTickDispatcher;
+import com.dwinovo.numen.core.task.TaskApi;
+import com.dwinovo.numen.core.task.chain.SpeakingLookChain;
+import com.dwinovo.numen.core.task.reflex.ReflexRegistry;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.nio.file.Path;
@@ -18,12 +31,17 @@ import java.nio.file.Path;
 /**
  * 模组入口。
  *
- * <p>对应上游的 {@code core/fabric/.../NumenCoreFabric.java}。上游那一份还要挂平台抽象、
- * 网络通道、数据生成、几百个事件；这一版只挂<b>跑起来必须有的</b>那几件：
+ * <p>对应上游的 {@code core/fabric/.../NumenCoreFabric.java}（内容刀）加
+ * {@code api/fabric/.../NumenMod.java}（引擎刀）两份接线之和。上游那一侧要挂平台抽象、
+ * 网络通道、几百个事件；这一版只挂<b>跑起来必须有的</b>那几件：
  *
  * <ol>
  *   <li>读配置（模型端点 + 外接大脑）；</li>
- *   <li>每个服务端刻驱动一次所有同伴的大脑；</li>
+ *   <li>网络通道登记（{@link NumenNetwork#register}）；</li>
+ *   <li>引擎自己的 API 函数组经插件那扇门登记（{@code api} / {@code task} / {@code module}）；</li>
+ *   <li>任务排程机器的 lifecycle 接线（同伴进场/离场/死亡 → 排程器）；</li>
+ *   <li>每个服务端刻的 START 驱动 {@link CompanionTickDispatcher}；</li>
+ *   <li>主人登录/断线/关服的三件事（恢复排队、程序收掉、世界状态作废）；</li>
  *   <li>注册 {@code /numen} 命令；</li>
  *   <li>外接大脑（MCP）服务端的起停与「此刻在不在世界里」的绑定。</li>
  * </ol>
@@ -33,9 +51,14 @@ import java.nio.file.Path;
  *   <li>命令回调在 1.16.5 上是 <b>{@code api.command.v1.CommandRegistrationCallback}</b>；
  *       {@code v2} 那个包是 1.19 才拆出来的。而且 v1 的回调签名是
  *       {@code (CommandDispatcher, boolean)} 两参（v2 是 {@code (dispatcher, registryAccess, environment)} 三参）。</li>
- *   <li>{@code ServerTickEvents.END_SERVER_TICK} 与 {@code ServerLifecycleEvents} 两代同名同形，
+ *   <li>{@code ServerTickEvents.START_SERVER_TICK} 与 {@code ServerLifecycleEvents} 两代同名同形，
  *       可以直接照抄。</li>
  * </ul>
+ *
+ * <h2>排程器为什么挂 START 而不是 END（照搬上游）</h2>
+ * 任务→导航→执行器落下的移动/按键输入由<b>本 tick 的实体物理立即消费</b>——「在位置 P 做的决策
+ * 作用于从 P 出发的这一步」，不产生一 tick 的输入滞后（潜行、松跳这些边缘时机全靠它）。
+ * 本仓旧的那套自驱动（大脑 + 工具）暂时仍挂在 END，与排程器新旧并存；删旧的是刀 3。
  *
  * <h2>外接大脑（MCP）的生命周期</h2>
  * HTTP 服务器在<b>模组初始化时</b>起（配置里 {@code enabled=true} 的话），之后一直活着——
@@ -67,7 +90,45 @@ public final class NumenCoreFabric implements ModInitializer {
                 .resolve("numen").resolve("mcp_server.json");
         McpMode.instance().bootstrap(mcpFile, McpConfig.load(mcpFile));
 
-        // 服务端刻：驱动所有同伴的大脑与长动作，顺带做一次外脑失联的边沿检测。
+        // 网络通道：把所有 payload 登记上去。上游两个 loader 入口的第一件事。
+        NumenNetwork.register();
+
+        // 引擎自己的几组 API 函数，和 core 与插件走同一扇门（NumenPlugins.register）：
+        // api（帮助）、task（手上的活与表）、module（Lua 模块）。它们属于引擎：谁登记了
+        // 函数，谁都指望帮助与这几样在。mc（原版指令）那一组上游在 api/common/mc/McApi.java，
+        // 尚未归位，登记它的时候一起补上。
+        NumenPlugins.register(NumenPlugins.NUMEN, numen -> {
+            numen.api("api", "The API itself: the typed signatures of a group's or a module's functions, or one "
+                    + "function in full.", HelpApi.class);
+            numen.api("task", "The background task and your pending timers.", TaskApi.class);
+            numen.api(ModuleApi.GROUP, "Modules — functions written in "
+                    + com.dwinovo.numen.agent.script.ScriptEngine.IN_USE.language() + " that programs use by name, kept "
+                    + "as files on your owner's computer (numen/work.lua is numen.work): the built-in ones, your own, "
+                    + "and how the programs that used them went.", ModuleApi.class);
+        });
+
+        // 任务排程机器的 lifecycle 接线（照搬上游 CommonClass.wireTaskMachine）：
+        // 引擎自己也走同一条总线，和插件用的是同一套事件——没有「内部另有一条捷径」。
+        CompanionEvents.subscribe(
+                CompanionEvent.DEATH,
+                CompanionTickDispatcher::clearActiveTask);
+        CompanionEvents.subscribe(
+                CompanionEvent.SPAWN,
+                CompanionTickDispatcher::onCompanionSpawned);
+        CompanionEvents.subscribe(
+                CompanionEvent.REMOVE,
+                CompanionTickDispatcher::onCompanionRemoved);
+        // 引擎自带姿态链的名册文书：提示词总览里的一行。
+        ReflexRegistry.register(new SpeakingLookChain());
+
+        // 排程机器的心跳：每 tick 驱动全部同伴的竞价/任务/收尾。
+        // 挂 START（实体更新之前）：任务→导航→执行器落下的移动/按键输入由
+        // 本 tick 的实体物理立即消费——「在位置 P 做的决策作用于从 P 出发
+        // 的这一步」，不产生一 tick 的输入滞后（潜行/松跳等边缘时机全靠它）。
+        ServerTickEvents.START_SERVER_TICK.register(CompanionTickDispatcher::tick);
+
+        // 服务端刻：旧的那套自驱动（大脑 + 长动作）与 MCP 边沿检测，暂时仍挂 END，
+        // 与上面的排程器新旧并存（删旧的是刀 3）。
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             Companions.tick(server);
             McpMode.instance().tick();
@@ -98,6 +159,28 @@ public final class NumenCoreFabric implements ModInitializer {
             McpActuator.unbind();
             if (server.isDedicatedServer()) {
                 McpMode.instance().shutdown();
+            }
+        });
+
+        // 服务器停了：属于那个世界的进程内状态一起作废（照搬上游 ServerLifecycleEvents.SERVER_STOPPED）。
+        // 单人「退出存档」不结束进程，静态表会原封不动活到下一个存档——谁持有谁在自己那边
+        // 报到，见 ServerLifecycle。
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> ServerLifecycle.fireStopped());
+
+        // 主人登录：只排队，不在这儿恢复——JOIN 跑在原版 placeNewPlayer 内部，在这里出的任何
+        // 异常都会打断主人的入场，客户端只看到「无效的玩家数据」（照搬上游注释）。
+        // 真正的恢复在下一次服务端刻的排程器里做（CompanionTickDispatcher.tick → restorePending）。
+        // 1.16.5 差异：回调给的是 ServerGamePacketListenerImpl，玩家是公开字段 player（1.20.1 才有 getPlayer()）。
+        ServerPlayConnectionEvents.JOIN.register((handler, sender, server) -> {
+            if (handler.player instanceof com.dwinovo.numen.core.entity.NumenPlayer) return;  // 不是同伴自己
+            Companions.scheduleRestoreFor(handler.player.getUUID());
+            Companions.syncRosterToOwner(server, handler.player);
+        });
+
+        // 主人断线：他名下在服务端跑着的程序收掉，等他答复的反向请求失败，他的模块缓存清掉。
+        ServerPlayConnectionEvents.DISCONNECT.register((handler, server) -> {
+            if (!(handler.player instanceof com.dwinovo.numen.core.entity.NumenPlayer)) {
+                ServerPrograms.ownerLeft(handler.player.getUUID());
             }
         });
 
