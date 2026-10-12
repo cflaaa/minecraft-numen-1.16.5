@@ -116,6 +116,8 @@ public final class NumenCoreFabric implements ModInitializer {
                     + com.dwinovo.numen.agent.script.ScriptEngine.IN_USE.language() + " that programs use by name, kept "
                     + "as files on your owner's computer (numen/work.lua is numen.work): the built-in ones, your own, "
                     + "and how the programs that used them went.", ModuleApi.class);
+            // 原版四件甲是第一处穿戴来源，和模组的饰品栏走同一扇门（上游 core/NumenCore.init 同款位置）。
+            numen.registerGear(new com.dwinovo.numen.core.gear.VanillaArmor());
         });
 
         // 任务排程机器的 lifecycle 接线（照搬上游 CommonClass.wireTaskMachine）：

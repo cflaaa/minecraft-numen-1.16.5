@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.dwinovo.numen.core.gear.Wardrobe;
 import com.dwinovo.numen.pathing.body.Aim;
 import com.dwinovo.numen.pathing.body.BodyCompat;
 import com.dwinovo.numen.pathing.body.Crosshair;
@@ -14,8 +15,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.entity.Mob;
-import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
@@ -139,31 +138,18 @@ public final class Acts {
     // ==================== 穿装备（inventory / gear）====================
 
     /**
-     * 把背包里的 {@code query} 穿到身上：按物品自己的装备槽（{@link Mob#getEquipmentSlotForItem}）
-     * 放进盔甲栏或副手，原来穿着的那件换回背包。
+     * 把背包里的 {@code query} 穿到身上。
      *
-     * <p>⚠️ 不调上游的 {@code Wardrobe.wear}（它属于还没搬的 {@code core/gear}），
-     * 但换进去的**是同一个槽**，所以穿完之后原版读到的装备状态是对的。
+     * <p>刀 2（{@code core/gear/Wardrobe} 归位）起，穿这件事交给 {@link Wardrobe#wear}
+     * ——穿进去的<b>是同一个槽</b>，但从此走穿戴来源那一扇门（原版四件甲与模组饰品栏同一套
+     * {@code GearSlot} 判据，权限层与 {@code TaskRecord} 也审计得到）。
      */
     public static String equip(NumenPlayer body, String query) {
         int from = find(body, query);
         if (from < 0) {
             return "背包里没有「" + query + "」";
         }
-        ItemStack stack = body.inventory.getItem(from);
-        EquipmentSlot slot = Mob.getEquipmentSlotForItem(stack);
-        if (slot == EquipmentSlot.MAINHAND) {
-            return name(stack) + " 不是能穿在身上的（它是手持的，用 goto 过去之后直接挖/放就行）";
-        }
-        int to = inventoryIndex(slot);
-        if (to < 0) {
-            return "认不出 " + name(stack) + " 该穿在哪（槽 " + slot + "）";
-        }
-        ItemStack worn = body.inventory.getItem(to);
-        body.inventory.setItem(to, stack.copy());
-        body.inventory.setItem(from, worn);
-        return "穿上了 " + name(stack) + "（" + label(slot) + "）"
-                + (worn.isEmpty() ? "" : "，换下来的 " + name(worn) + " 放回了背包");
+        return Wardrobe.wear(body, body.inventory.getItem(from).getItem(), null).message();
     }
 
     // ==================== 吃东西（inventory）====================
@@ -249,18 +235,6 @@ public final class Acts {
             }
         }
         return hits.isEmpty() ? -1 : hits.get(0);
-    }
-
-    /** 装备槽在 {@code Inventory} 统一下标里的位置；不是盔甲/副手为 -1。 */
-    private static int inventoryIndex(EquipmentSlot slot) {
-        return switch (slot) {
-            case OFFHAND -> 40;
-            case FEET -> 36;
-            case LEGS -> 37;
-            case CHEST -> 38;
-            case HEAD -> 39;
-            default -> -1;
-        };
     }
 
     private static String label(EquipmentSlot slot) {
