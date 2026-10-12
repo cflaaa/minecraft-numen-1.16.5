@@ -5,6 +5,7 @@ Numen 模组 **1.20.1 → 1.16.5 Fabric** 移植。仓库 `numen-1.16.5/`，上�
 分层：`lua`/`agent`/`ai` 逐字照搬（不依赖 MC）；`pathing` MC 侧寻路；`core` 1.16.5 适配层。
 
 ## ⭐ 先读这三份（别再去翻海量上下文找决策）
+- **`numen-1.16.5/docs/STATUS.md`** —— **状态台账（活文档）**：逐刀进度 + 真机验收台账。**用户拍板（2026-10-12）：每次真机测试完成后必须及时更新它并提交，不等攒批。**
 - **`numen-1.16.5/docs/DECISIONS.md`** —— **决策台账**，用户已拍板事项的唯一出处。讨论计划/方向前**先读它**。
 - **`numen-1.16.5/docs/RESTORE_PLAN_V3.md`** —— 当前执行计划（自包含）。
   ⚠️ 其中「方案乙」已被证伪 → 实际走**方案甲**（`program/` 22 + `network/` 33 全搬，接缝归零）。见 DECISIONS §四、PORTING §17.9。
@@ -12,8 +13,10 @@ Numen 模组 **1.20.1 → 1.16.5 Fabric** 移植。仓库 `numen-1.16.5/`，上�
 - 另：`UPSTREAM_COMPARISON.md`（结构审计）、`RESTORE_PLAN.md`(v1)/`_V2.md`(v2) 为历史稿。
 
 ## 构建
-`JAVA_HOME=.toolchain/jdk-17.0.20.1+1 .toolchain/gradle-7.6.4/bin/gradle :core:build`
+`.toolchain/` 在**仓库根**（`我的世界/.toolchain/`），不在 `numen-1.16.5/` 里；gradle 要在 `numen-1.16.5/` 下跑：
+`JAVA_HOME="../.toolchain/jdk-17.0.20.1+1" ../.toolchain/gradle-7.6.4/bin/gradle :core:build`
 （Java 17 + 官方 Mojang 映射，勿改 Yarn）。报 `Could not download` 是 maven.fabricmc.net 抖动，重跑即可。
+**jar 类数基线随刀更新并记入 STATUS.md**（当前 620 = core 385 + pathing 235）。
 
 ## 硬约束（详见 PORTING.md）
 - **发行 jar 丢 pathing 类**：loom 0.12 跨项目共享 TinyRemapperService 所致，已在 core+pathing 都加 `remapperIsolation.set(true)`。改完 pathing 要 clean 重建 + **逐个比对 jar 类名**（曾实测 346 = pathing 235 + core 111，数字随代码变）。

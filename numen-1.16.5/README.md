@@ -37,16 +37,16 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 | 行为许可层 `permission/`（17 文件） | ✅ 已搬：`Gate`（主人三层 + 出厂表）、`Rule` 解析器、`PlacedBlocks` 账本、`ConsentDesk` 征询，外加 `/numen permission` 与 `/numen consent` 命令树 |
 | 权限闸接线 | ✅ `mine` / `use_block` / `drop` 过闸（ASK 时把这次调用**停在原地**发征询，答复后带回同一次调用重跑）；Lua 的 `numen.inv.drop` / `numen.use.block` 同步过闸；寻路那条路由 `GateTerrain` 逐格裁决 |
 | 外接大脑（MCP） | ✅ `core/mcp/`：JDK `HttpServer` 上手写的 MCP 服务端（JSON-RPC 2.0），外部 agent 可全程驱动同伴；外脑驱动期间内置大脑停牌 |
-| 工具表 | 🟡 **12 个**原子动作（上游 44 个），仍是本仓的扁平表，未换上游 `ToolRegistry` |
+| 工具表 | ✅ 上游 `agent/tool` 全套照搬（ToolRegistry / ScriptTool / SkillTool / TodoTool / MemoryTool），core `ToolRunner` 统一派发：**15 工具**（4 大脑 + 11 世界），MCP `tools/list` **19 个** |
 | 客户端界面 | 🟡 G 面板（**G** 键）是**自绘**的，不是上游原版 UI |
 | 征询界面 | 🟡 聊天消息 + 可点击按钮（`RUN_COMMAND`）——这是 A 计划的**最终形态**，不是过渡（`network/` 不搬） |
-| 完整任务集（建造 / 战斗 / 钓鱼 / 开箱 / 合成… 13 族） | ❌ 未搬（归位计划阶段 5） |
-| `sdk/`（`@Fn` API 框架） | ❌ 未搬（归位计划阶段 1 的另一半） |
+| 完整任务集（建造 / 战斗 / 钓鱼 / 开箱 / 合成… 13 族） | ❌ 未搬（刀 4） |
+| `sdk/`（`@Fn` API 框架） | 🟡 `@Fn` 三组（api/task/module）已登记、真机验通（help / status）；完整任务族随刀 4 |
 | 并发与每刻主线程预算 | ❌ 未做——`program/ProgramLimits` 不在 A 计划内，做多人服要另补这条闸 |
 
-**一句话**：引擎 + 适配层 + 寻路 + 权限层都站在 1.16.5 上了，**真机跑得通**（专用服务端与真实客户端
-的端到端测试都验过，见 `docs/PORTING.md` §11 / §16 / §17）。离上游还差的是**任务框架与 13 族任务本体**、
-`sdk/`，以及工具表 / 客户端 UI 这两处本仓自写的简化版。阶段划分与进度见 `docs/RESTORE_PLAN.md`。
+**一句话**：引擎 + 适配层 + 寻路 + 权限层 + 工具统一派发（`ToolRunner`）都站在 1.16.5 上了，**真机跑得通**
+（专用服务端与真实客户端的端到端测试都验过，见 `docs/PORTING.md` §11 / §16 / §17）。离上游还差的是
+**任务框架与 13 族任务本体**（刀 4），以及客户端 UI 这处自绘简化版。**逐刀进度与验收台账见 `docs/STATUS.md`。**
 
 ---
 
@@ -57,11 +57,10 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 ```
 ./gradlew :core:build                    ✅ BUILD SUCCESSFUL
   产出 core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar    (≈1.2 MB)
-  └─ META-INF/jars/  agent + ai + lua 三个嵌套 jar 已就位
-  └─ 平铺 346 个 class = pathing 235 + core 111
+  └─ META-INF/jars/  五件套嵌套 jar 已就位（agent + ai + lua + slf4j-api 1.7.36 + log4j-slf4j-impl 2.8.1）
+  └─ 平铺 620 个 class = pathing 235 + core 385
 
-./gradlew :lua:test :agent:test :ai:test :core:test    ✅ 525 tests / 0 failures
-  lua 34 · agent 283 · ai 148 · core 60
+./gradlew :lua:test :agent:test :ai:test :core:test    ✅ 全绿（最新基线见 docs/STATUS.md）
 ```
 
 真机验证（专用 Fabric 1.16.5 服务端 + 真实 1.16.5 客户端 + 外接大脑）跑通过：召唤同伴、
