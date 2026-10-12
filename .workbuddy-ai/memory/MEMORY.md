@@ -6,7 +6,8 @@ Numen 模组 **1.20.1 → 1.16.5 Fabric** 移植。仓库 `numen-1.16.5/`，上�
 
 ## ⭐ 先读这三份（别再去翻海量上下文找决策）
 - **`numen-1.16.5/docs/DECISIONS.md`** —— **决策台账**，用户已拍板事项的唯一出处。讨论计划/方向前**先读它**。
-- **`numen-1.16.5/docs/RESTORE_PLAN_V3.md`** —— 当前执行计划（自包含，方案乙）。
+- **`numen-1.16.5/docs/RESTORE_PLAN_V3.md`** —— 当前执行计划（自包含）。
+  ⚠️ 其中「方案乙」已被证伪 → 实际走**方案甲**（`program/` 22 + `network/` 33 全搬，接缝归零）。见 DECISIONS §四、PORTING §17.9。
 - **`numen-1.16.5/docs/PORTING.md`** —— 技术细节与全部踩坑（引用写 §号）。
 - 另：`UPSTREAM_COMPARISON.md`（结构审计）、`RESTORE_PLAN.md`(v1)/`_V2.md`(v2) 为历史稿。
 

@@ -78,6 +78,11 @@ JAVA_HOME=../.toolchain/jdk-17.0.20.1+1 ../.toolchain/gradle-7.6.4/bin/gradle :c
 - **原版不许把方块放进玩家自己身体里**：测试别点同伴脚下那格。
 - 探针脚本取坐标用 `math.floor`，**别用 `int()`**。
 - 本机 `http_proxy` 代理 localhost → Python 用 `ProxyHandler({})`，curl 用 `--noproxy '*'`。
+- **批量替换脚本会误伤注释**：`buf.xxx(` / `JsonParser.parseString(` 这类替换会连 **javadoc 注释里的示例文字**
+  一起改，把说明写废；还会给同包文件加多余 import。**每次批量替换后 `git diff` 只该有新搬进来的文件**，
+  既有文件（`NumenCoreFabric`/`NumenTools`/`McpConfig` 这类）出现改动一律先怀疑脚本，`git checkout HEAD --` 还原。
+- **搬运脚本会盖掉本仓改好的文件**：往 `DIRS` 里加新目录前，先想清楚该目录里有没有本仓已适配过的文件
+  （踩过：`mixin/BlockItemPlaceMixin`）。有就加进 `EXISTING` 白名单。
 - 跑 `ssh-run.py` 要用带 paramiko 的 python：`C:/Users/cfl/.workbuddy-ai/binaries/python/envs/default/Scripts/python.exe`。
 
 ## 每刀做完必须做
