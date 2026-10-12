@@ -120,6 +120,9 @@ public final class NumenPlayer extends ServerPlayer implements Body {
 
     public void setOwnerUuid(UUID ownerUuid) {
         this.ownerUuid = ownerUuid;
+        // 大脑在服务端：按主人分目录（模块 lua/<主人>/）的那一张表在这儿写。
+        // 召唤与复活都经过这一句，所以这张表始终是新的。
+        Companions.rememberOwner(getUUID(), ownerUuid);
     }
 
     /** 跨维度安全的归属判断——比 UUID，不用原版那套依赖当前维度的 {@code isOwnedBy}。 */

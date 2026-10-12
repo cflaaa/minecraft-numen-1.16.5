@@ -27,10 +27,12 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.network.chat.TranslatableComponent;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
@@ -46,6 +48,7 @@ import java.util.regex.Pattern;
  *   /numen list                        看看现在有谁
  *   /numen tell &lt;名字&gt; &lt;话&gt;           跟她说一句
  *   /numen status &lt;名字&gt;              看她此刻在干什么、端点通不通
+ *   /numen program &lt;名字&gt; &lt;Lua&gt;      让她跑一段 Lua（移植期开发入口，不是玩家功能）
  *   /numen config &lt;项&gt; &lt;值&gt;           改配置（apiKey / model / baseUrl / provider / persona / initiative）
  * </pre>
  */
@@ -77,6 +80,14 @@ public final class NumenCommand {
                 .then(Commands.literal("status")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(ctx -> status(ctx, StringArgumentType.getString(ctx, "name")))))
+                // 移植期开发入口：真机上跑一段 Lua，走产品同一条程序链路（分片、编解码、
+                // @Fn 索引、权限闸、主线程车道）。不是给玩家用的功能命令。
+                .then(Commands.literal("program")
+                        .then(Commands.argument("name", StringArgumentType.word())
+                                .then(Commands.argument("code", StringArgumentType.greedyString())
+                                        .executes(ctx -> program(ctx,
+                                                StringArgumentType.getString(ctx, "name"),
+                                                StringArgumentType.getString(ctx, "code"))))))
                 .then(Commands.literal("config")
                         .then(Commands.argument("key", StringArgumentType.word())
                                 .then(Commands.argument("value", StringArgumentType.greedyString())
@@ -259,6 +270,88 @@ public final class NumenCommand {
                     ModLanguageData.Keys.COMMAND_CONSENT_NOT_PENDING, id));
         }
         return reply == ConsentDesk.Reply.ANSWERED ? 1 : 0;
+    }
+
+    // ---- /numen program（移植期开发入口，2026-10-12 刀 1b） ----
+
+    /**
+     * 每个服务器一个扮主人客户端的 {@link LoopbackClient}：送程序、停程序、收回执、答反向请求
+     * 用的都是产品里的同一批部件，上行与下行的包经过线上的样子（分片、各编码再解码一遍），
+     * 只是不出进程。世界作废时清掉——它闭包里关着那个世界的服务器引用。
+     */
+    private static volatile net.minecraft.server.MinecraftServer loopServer;
+    private static volatile com.dwinovo.numen.core.program.LoopbackClient loopClient;
+    private static final java.util.concurrent.atomic.AtomicInteger PROGRAM_SEQ =
+            new java.util.concurrent.atomic.AtomicInteger();
+
+    static {
+        com.dwinovo.numen.core.platform.ServerLifecycle.onStopped(() -> {
+            loopServer = null;
+            loopClient = null;
+        });
+    }
+
+    private static com.dwinovo.numen.core.program.LoopbackClient loopback(MinecraftServer server) {
+        com.dwinovo.numen.core.program.LoopbackClient client = loopClient;
+        if (client == null || loopServer != server) {
+            synchronized (NumenCommand.class) {
+                client = loopClient;
+                if (client == null || loopServer != server) {
+                    loopServer = server;
+                    loopClient = client = new com.dwinovo.numen.core.program.LoopbackClient(
+                            uuid -> bodyOf(server, uuid),
+                            com.dwinovo.numen.core.script.Modules::of);
+                }
+            }
+        }
+        return client;
+    }
+
+    /**
+     * 程序线程问身体：翻玩家列表这事排到主线程做，程序线程等结果。
+     * （纪律同上游：主线程只执行任务，从不等任何程序；反方向等是允许的。）
+     */
+    private static NumenPlayer bodyOf(MinecraftServer server, UUID uuid) {
+        if (Thread.currentThread() == server.getRunningThread()) {
+            return Companions.findByUuid(server, uuid);
+        }
+        java.util.concurrent.atomic.AtomicReference<NumenPlayer> box =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.CountDownLatch gate = new java.util.concurrent.CountDownLatch(1);
+        server.execute(() -> {
+            box.set(Companions.findByUuid(server, uuid));
+            gate.countDown();
+        });
+        try {
+            gate.await();
+        } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
+        }
+        return box.get();
+    }
+
+    /**
+     * {@code /numen program <名字> <Lua 代码>}：让执行者的那只同伴跑一段 Lua。
+     *
+     * <p>回执（结局一行 + returned/stderr/stdout 三栏）在服务端主线程上交回一次——排程器的
+     * 主线程车道轮到这段程序时把 @Fn 调用执行完，程序在自己的线程上收结果。
+     */
+    private static int program(CommandContext<CommandSourceStack> ctx, String name, String code)
+            throws CommandSyntaxException {
+        CommandSourceStack source = ctx.getSource();
+        ServerPlayer owner = source.getPlayerOrException();
+        NumenPlayer body = Companions.findByName(source.getServer(), name);
+        if (body == null || !body.isOwnedByPlayer(owner.getUUID())) {
+            fail(ctx, "没有名叫 " + name + " 的同伴（或者不是你的）");
+            return 0;
+        }
+        String programId = "cmd-" + PROGRAM_SEQ.incrementAndGet();
+        loopback(source.getServer()).run(body.getUUID(), programId, code,
+                com.dwinovo.numen.core.program.CallObserver.NONE,
+                result -> source.sendSuccess(
+                        new TextComponent("[program " + programId + "] " + result.toJson()), false));
+        source.sendSuccess(new TextComponent("程序 " + programId + " 已派出"), false);
+        return 1;
     }
 
     // ---- 各子命令 ----

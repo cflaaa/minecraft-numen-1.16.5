@@ -48,6 +48,33 @@ public final class Companions {
     /** 身体 UUID → 大脑。一具身体一个大脑，身体走了大脑一起走。 */
     private static final Map<UUID, CompanionBrain> BRAINS = new LinkedHashMap<>();
 
+    /**
+     * 同伴 UUID → 主人 UUID。
+     *
+     * <p>给「大脑在服务端」这一侧按主人分东西用——模块目录 {@code lua/<主人>/} 就是她
+     * （上游那侧是客户端， Modules.init 直接问登录账号；这一侧多几个主人，得记下谁是谁的）。
+     * 每具身体出生时写（{@link NumenPlayer#setOwnerUuid} 是唯一赋值点，召唤与复活都经过它），
+     * 永久除名时清。看到 {@code null} 按「还谈不上归属」处理即可。
+     */
+    private static final Map<UUID, UUID> OWNERS = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 这只同伴的主人；没记过是 null。 */
+    public static UUID ownerOf(UUID companion) {
+        return OWNERS.get(companion);
+    }
+
+    /** 记下归属（{@link NumenPlayer#setOwnerUuid} 调）。 */
+    public static void rememberOwner(UUID companion, UUID owner) {
+        if (companion != null && owner != null) {
+            OWNERS.put(companion, owner);
+        }
+    }
+
+    /** 除名时忘掉归属。 */
+    public static void forgetOwner(UUID companion) {
+        OWNERS.remove(companion);
+    }
+
     /** 死亡之后隔多久把她放回主人身边（毫秒）。 */
     private static final long RESPAWN_DELAY_MS = 5_000L;
 
@@ -543,6 +570,7 @@ public final class Companions {
             reg.remove(uuid);
             outbox.forget(uuid);              // 她攒的事件跟着走：没人会再收
             CompanionStateWatch.forget(uuid); // 背包镜像同理：这个 UUID 不会再回来了
+            forgetOwner(uuid);                // 归属映射同理
         }
         ServerPlayer owner = ownerUuid == null ? null : server.getPlayerList().getPlayer(ownerUuid);
         if (owner != null) {

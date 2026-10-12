@@ -27,6 +27,7 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.nio.file.Path;
+import java.util.UUID;
 
 /**
  * 模组入口。
@@ -92,6 +93,16 @@ public final class NumenCoreFabric implements ModInitializer {
 
         // 网络通道：把所有 payload 登记上去。上游两个 loader 入口的第一件事。
         NumenNetwork.register();
+
+        // 她的 Lua 模块按主人分目录（lua/<主人>/，同一主人的同伴共用一个）。上游那一侧是
+        // 客户端，CompanionHome 直接问登录账号；这一侧大脑在服务端，按 Companions 记下的
+        // 「同伴→主人」映射解析（每具身体出生时写，见 NumenPlayer#setOwnerUuid）。
+        // （出厂的那一套 Lua 正文随任务族那一刀一起搬，这里先把目录映射接上。）
+        Path numenRoot = FabricLoader.getInstance().getConfigDir().resolve("numen");
+        com.dwinovo.numen.core.script.Modules.init(companion -> {
+            UUID owner = Companions.ownerOf(companion);
+            return numenRoot.resolve("lua").resolve(owner == null ? "unknown" : owner.toString());
+        });
 
         // 引擎自己的几组 API 函数，和 core 与插件走同一扇门（NumenPlugins.register）：
         // api（帮助）、task（手上的活与表）、module（Lua 模块）。它们属于引擎：谁登记了
