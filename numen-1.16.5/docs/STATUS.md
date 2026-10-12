@@ -115,3 +115,29 @@ JAVA_HOME="../.toolchain/jdk-17.0.20.1+1" ../.toolchain/gradle-7.6.4/bin/gradle 
 1. 每把刀：编译 + 单测 + jar 类数比对 + 真机验收 → **更新本文件**（含验收台账一行）→ git 提交（一次一刀）。
 2. **用户拍板（2026-10-12）**：之后的修改、更新、修 bug 等，都要在**实际测试完成后及时**记录到本文件，不等攒批。
 3. 计划与方向变更先过 `DECISIONS.md`，本文件只记事实与状态。
+
+---
+
+## 八、与原版的体量对照（2026-10-12 实测）
+
+> 口径：只算 `src/main/java`（Fabric 可用代码）；`core/forge`(33 文件) 与 `bench`(11) 不计（本仓只做 Fabric）。
+> 数字为 `find | wc` 实测。
+
+**上游合计（Fabric 相关）**：729 文件 / 103,706 行；**本仓**：478 文件 / 72,572 行。
+
+| 层 | 上游 | 本仓 | 覆盖 |
+|---|---|---|---|
+| 引擎 `lua`/`agent`/`ai` | 123 / 29,983 | 142 / 32,146 | ✅ **100%**（逐字照搬；本仓 `agent` 多出的 18 件是上游 `api/common` 的工具/技能层归位） |
+| 寻路 `pathing` | 116 / 12,952 | 117 / 13,316 | ✅ **100%** |
+| `api/common`（sdk·task框架·permission·program·network·script·platform·api·entity·mc…） | 226 / 24,953 | ≈177 件已搬 | 🟡 **≈78%**（缺 `agent` 胶水 26、`mixin` 10、`area` 2、`data` 部分） |
+| `core/common`（**13 任务族 + tools + nav/route/scan/build/combat…**） | 178 / 26,021 | ≈6 件（gear 2 + nav 壳 3 + Acts 1） | ❌ **≈3%** ← **主体缺口在刀 4** |
+| `ui` | 32 / 3,891 | 自绘 G 面板 7 / 1,680 | 🟡 版本原因顶替（C 类） |
+| `plugins` | 48 / 5,689 | 0（仅用其出口 `NumenPlugins.register`） | ❌ 未搬 |
+| `core/forge` / `bench` | 44 / 16,748 | — | ⬜ 不适用 / 未做 |
+
+**功能面**：上游核心 `@Fn` API 函数 **54 个**（不含 `plugins`/`forge`/测试，实测 `grep`）；
+本仓当前暴露 **15 个工具**（4 大脑 + 11 世界：say/get_status/inspect_block/scan_blocks/goto/mine/
+use_block/inventory/equip/eat/drop），MCP `tools/list` **19 个**。→ 功能面约 **28%**，缺口同样是 13 任务族。
+
+**一句话**：按 Fabric 可用代码量算，**已完成原版约 6 成**；引擎与寻路 100%、适配层约 8 成，
+**剩下的主要就是 `core/common` 的任务族与工具本体（刀 4，≈99 文件），外加 UI/插件两块整缺口**。
