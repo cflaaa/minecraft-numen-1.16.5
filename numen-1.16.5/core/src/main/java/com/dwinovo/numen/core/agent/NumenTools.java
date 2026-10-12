@@ -12,7 +12,6 @@ import com.dwinovo.numen.core.permission.ConsentItem;
 import com.dwinovo.numen.core.permission.Gate;
 import com.dwinovo.numen.core.permission.Permission;
 import com.dwinovo.numen.core.permission.Verdict;
-import com.dwinovo.numen.core.script.CompanionScript;
 import com.dwinovo.numen.core.task.act.Acts;
 import com.dwinovo.numen.pathing.body.BodyCompat;
 import com.google.gson.JsonObject;
@@ -60,7 +59,7 @@ import java.util.UUID;
  * 不过闸，走的是「看」不是「做」。
  *
  * <p>⚠️ {@code lua} 那条路**不能等**主人（一段 Lua 是同步跑完的），所以它的动手内置函数只做同步裁决，
- * 「要问」时如实失败（见 {@code CompanionScript#guard}）。
+
  */
 public final class NumenTools {
 
@@ -176,22 +175,47 @@ public final class NumenTools {
                             "properties", obj(
                                     "item", obj("type", "string", "description", "物品 id 或名字里的一段"),
                                     "count", obj("type", "integer", "description", "丢几个；省缺=全丢")),
-                            "required", List.of("item"))),
-
-            new Spec("lua",
-                    "写一段 Lua 程序，一次做完好几步——比一步一步调工具省得多。"
-                            + "能调的：numen.inv.items() / numen.inv.eat{item=} / numen.inv.drop{item=,count=} / "
-                            + "numen.gear.hold{item=} / numen.use.block{x=,y=,z=}。"
-                            + "用 print(...) 报告你看到的东西；用 return 交回一个值。"
-                            + "程序是同步跑完的（不能等跨刻的动作），有 200 次调用与二十分钟的墙钟上限"
-                            + "（上限由引擎的 ScriptLimits 强制）。",
-                    obj("type", "object",
-                            "properties", obj(
-                                    "code", obj("type", "string", "description", "Lua 程序正文")),
-                            "required", List.of("code"))));
+                            "required", List.of("item"))));
 
     public static List<IToolSpec> specs() {
         return SPECS;
+    }
+
+    /**
+     * 把本表的世界工具逐个包成 {@link com.dwinovo.numen.agent.tool.NumenTool}（刀 3）：
+     * 名字/说明/参数 schema 照旧，执行由 {@code ToolRunner} 认领后仍走下面的 Job 机制。
+     * 一处适配都不做——换的只是「谁把它们登记进引擎的工具表」。
+     */
+    public static List<com.dwinovo.numen.agent.tool.NumenTool> asNumenTools() {
+        List<com.dwinovo.numen.agent.tool.NumenTool> out = new ArrayList<>(SPECS.size());
+        for (IToolSpec spec : SPECS) {
+            out.add(new com.dwinovo.numen.core.agent.tool.WorldTool(spec));
+        }
+        return out;
+    }
+
+    /**
+     * 单次调用跑一个世界工具（刀 3 的统一派发入口{@code ToolRunner} 用）。
+     *
+     * <p>和 {@link #run} 同一套 Job 机制——征询停车、跨刻长动作、逐刻推进全照旧；
+     * 只是回报口从 {@link ToolPort.Sink} 换成一个「结算了就调一次」的 {@code done}。
+     */
+    public static void runSingle(NumenPlayer body, CompanionBrain brain, LlmToolCall call,
+                                 java.util.function.Consumer<String> done) {
+        run(body, brain, List.of(call), new ToolPort.Sink() {
+            @Override
+            public void started(LlmToolCall c) {
+            }
+
+            @Override
+            public void finished(LlmToolCall c, String resultJson) {
+                done.accept(resultJson);
+            }
+
+            @Override
+            public void settled() {
+            }
+        });
     }
 
     /**
@@ -394,12 +418,6 @@ public final class NumenTools {
                                 ? notDone(action, job.refusal)
                                 : Acts.drop(body, query, intArg(args, "count")));
                     }
-                    job.index++;
-                }
-                case "lua" -> {
-                    // 登记内置函数（幂等），然后整段同步跑完。
-                    CompanionScript.installBuiltins();
-                    job.sink.finished(call, result(CompanionScript.run(body, text(args, "code")), true, null));
                     job.index++;
                 }
                 case "goto" -> {

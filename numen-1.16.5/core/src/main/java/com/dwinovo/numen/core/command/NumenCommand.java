@@ -279,56 +279,8 @@ public final class NumenCommand {
      * 用的都是产品里的同一批部件，上行与下行的包经过线上的样子（分片、各编码再解码一遍），
      * 只是不出进程。世界作废时清掉——它闭包里关着那个世界的服务器引用。
      */
-    private static volatile net.minecraft.server.MinecraftServer loopServer;
-    private static volatile com.dwinovo.numen.core.program.LoopbackClient loopClient;
     private static final java.util.concurrent.atomic.AtomicInteger PROGRAM_SEQ =
             new java.util.concurrent.atomic.AtomicInteger();
-
-    static {
-        com.dwinovo.numen.core.platform.ServerLifecycle.onStopped(() -> {
-            loopServer = null;
-            loopClient = null;
-        });
-    }
-
-    private static com.dwinovo.numen.core.program.LoopbackClient loopback(MinecraftServer server) {
-        com.dwinovo.numen.core.program.LoopbackClient client = loopClient;
-        if (client == null || loopServer != server) {
-            synchronized (NumenCommand.class) {
-                client = loopClient;
-                if (client == null || loopServer != server) {
-                    loopServer = server;
-                    loopClient = client = new com.dwinovo.numen.core.program.LoopbackClient(
-                            uuid -> bodyOf(server, uuid),
-                            com.dwinovo.numen.core.script.Modules::of);
-                }
-            }
-        }
-        return client;
-    }
-
-    /**
-     * 程序线程问身体：翻玩家列表这事排到主线程做，程序线程等结果。
-     * （纪律同上游：主线程只执行任务，从不等任何程序；反方向等是允许的。）
-     */
-    private static NumenPlayer bodyOf(MinecraftServer server, UUID uuid) {
-        if (Thread.currentThread() == server.getRunningThread()) {
-            return Companions.findByUuid(server, uuid);
-        }
-        java.util.concurrent.atomic.AtomicReference<NumenPlayer> box =
-                new java.util.concurrent.atomic.AtomicReference<>();
-        java.util.concurrent.CountDownLatch gate = new java.util.concurrent.CountDownLatch(1);
-        server.execute(() -> {
-            box.set(Companions.findByUuid(server, uuid));
-            gate.countDown();
-        });
-        try {
-            gate.await();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-        }
-        return box.get();
-    }
 
     /**
      * {@code /numen program <名字> <Lua 代码>}：让执行者的那只同伴跑一段 Lua。
@@ -346,8 +298,8 @@ public final class NumenCommand {
             return 0;
         }
         String programId = "cmd-" + PROGRAM_SEQ.incrementAndGet();
-        loopback(source.getServer()).run(body.getUUID(), programId, code,
-                com.dwinovo.numen.core.program.CallObserver.NONE,
+        // 与 lua 工具同一条路（ToolRunner.runProgram）：LoopbackClient 扮客户端，产品部件原样
+        com.dwinovo.numen.core.agent.tool.ToolRunner.runProgram(body, programId, code,
                 result -> source.sendSuccess(
                         new TextComponent("[program " + programId + "] " + result.toJson()), false));
         source.sendSuccess(new TextComponent("程序 " + programId + " 已派出"), false);

@@ -6,6 +6,7 @@ import com.dwinovo.numen.agent.inbox.EventTypes;
 import com.dwinovo.numen.agent.llm.ConvoState;
 import com.dwinovo.numen.agent.llm.NumenLlmClient;
 import com.dwinovo.numen.agent.loop.AgentLoop;
+import com.dwinovo.numen.core.agent.tool.ToolRunner;
 import com.dwinovo.numen.agent.loop.HaltReason;
 import com.dwinovo.numen.agent.loop.HostPort;
 import com.dwinovo.numen.agent.loop.LoopEvent;
@@ -268,7 +269,7 @@ public final class CompanionBrain {
         public ModelRequest turnRequest() {
             return new ModelRequest(
                     transcript.snapshot(),
-                    NumenTools.specs(),
+                    ToolRunner.specs(),
                     NumenSystemPrompt.system(NumenConfig.get().persona));
         }
 
@@ -307,17 +308,28 @@ public final class CompanionBrain {
      * 工具那一侧：按顺序执行一批调用，一个做完了才派下一个。
      *
      * <p>身体只有一个动作槽，所以不并行——这是引擎的 {@code SerialCalls} 契约。
+     *
+     * <p>刀 3 起走 {@link ToolRunner} 的统一派发：程序（{@code lua}）送进服务端程序链路，
+     * 大脑工具（技能/计划/札记）在 {@code ToolRegistry} 里，世界工具仍走旧 Job 机制。
      */
     private final class ToolPortImpl implements ToolPort {
 
         @Override
         public void run(List<LlmToolCall> calls, Sink sink) {
-            NumenTools.run(body, CompanionBrain.this, calls, sink);
+            ToolRunner.run(body, CompanionBrain.this, calls, sink);
         }
 
         @Override
         public void arrived(EventQueue.Entry entry, boolean urgent) {
-            // 这一版没有「在服务端跑着一段程序」的情形，插话直接排队即可。
+            // 她正跑着一段程序而这是急件：让程序停在调用之间（上游 CompanionToolPort 同一口径）。
+            // 不着急的照样排队——程序里的调用不等它。
+            if (urgent) {
+                String programId = ToolRunner.runningProgram(body.getUUID());
+                if (programId != null) {
+                    com.dwinovo.numen.core.program.ServerPrograms.interrupt(
+                            body.getUUID(), programId, entry.type());
+                }
+            }
         }
 
         @Override
@@ -325,6 +337,12 @@ public final class CompanionBrain {
             if (stopBody) {
                 body.controls().releaseAll();
                 activity = null;
+            }
+            // 在跑的程序同一下叫停（它的回执还会到，晚到的按 AfterCut 处理——本仓先只叫停）。
+            String programId = ToolRunner.runningProgram(body.getUUID());
+            if (programId != null) {
+                com.dwinovo.numen.core.program.ServerPrograms.cutOff(
+                        body.getUUID(), programId, stopBody);
             }
             return List.of();
         }

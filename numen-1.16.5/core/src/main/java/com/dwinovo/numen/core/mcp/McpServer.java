@@ -33,10 +33,10 @@ import java.util.concurrent.TimeoutException;
  * （都是本仓还没有的东西，逐条写在 docs/PORTING.md 的「外接大脑」一节）：
  *
  * <ul>
- *   <li><b>工具面小得多</b>：上游把引擎的全套工具（跑程序的 {@code lua}、技能、计划、札记）
- *       外加远端 MCP 工具都挂出来；本仓只有 {@link NumenTools#specs()} 那六个原子动作，
- *       所以 {@code tools/list} 就只给这些 + 五个管理/对话工具。
- *       <b>说明文字必须跟着改</b>——让外脑去调一个不存在的工具，比少给一个工具糟得多；</li>
+ *   <li><b>工具面</b>：{@code tools/list} 全量给——{@code ToolRunner.specs()}（= {@code ToolRegistry}
+ *       全表：跑程序的 {@code lua}、技能、计划、札记四个大脑工具 + 本仓的世界工具）加上五个
+ *       管理/对话工具。刀 3 起枚举源是登记表，新增工具只登记一次，两边（MCP 与内置大脑）
+ *       自动都看得见；世界工具的实现随刀 4 逐族换成上游 @Fn 函数时，这个面一行不用改。</li>
  *   <li><b>没有现场缓冲</b>（上游的 {@code McpTranscript}，喂设置面板里那条活动流）；
  *       本仓没有面板，工具调用改成写日志；</li>
  *   <li><b>没有接入提示词按钮</b>，那段话由 {@link McpMode#accessPrompt()} 提供；</li>
@@ -46,8 +46,8 @@ import java.util.concurrent.TimeoutException;
  *
  * <h2>工具面</h2>
  * {@code list_companions} / {@code create_companion} / {@code delete_companion} /
- * {@code get_events} / {@code say}，加上每个原子工具（{@link NumenTools#specs()} 减掉配置里
- * {@code hidden_tools} 那批，再减掉 {@code say}——它已经有专属的对话版了），
+ * {@code get_events} / {@code say}，加上 {@link com.dwinovo.numen.core.agent.tool.ToolRunner#specs()}
+ * 全表（减掉配置里 {@code hidden_tools} 那批，再减掉 {@code say}——它已经有专属的对话版了），
  * 每个都多注入一个必填的 {@code companion} 参数，调用经 {@link McpActuator#invoke} 落到
  * 同伴自己的工具口上。模式开着期间内置大脑一轮都不开，所以外部驱动者直接派活即可，
  * 没有「取得控制权」这一步。
@@ -319,7 +319,7 @@ public final class McpServer {
                 saySchema()));
 
         // 全量给外脑，不做渐进披露：那是我们自己请求里的省法，外脑的上下文预算归它自己管。
-        for (IToolSpec tool : NumenTools.specs()) {
+        for (IToolSpec tool : com.dwinovo.numen.core.agent.tool.ToolRunner.specs()) {
             if (DEDICATED_SAY.equals(tool.name()) || config.isHidden(tool.name())) {
                 continue;
             }

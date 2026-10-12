@@ -17,8 +17,10 @@ import com.dwinovo.numen.core.script.ModuleApi;
 import com.dwinovo.numen.core.sdk.HelpApi;
 import com.dwinovo.numen.core.task.CompanionTickDispatcher;
 import com.dwinovo.numen.core.task.TaskApi;
+import com.dwinovo.numen.core.agent.tool.ToolRunner;
 import com.dwinovo.numen.core.task.chain.SpeakingLookChain;
 import com.dwinovo.numen.core.task.reflex.ReflexRegistry;
+import net.minecraft.server.MinecraftServer;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -120,6 +122,23 @@ public final class NumenCoreFabric implements ModInitializer {
             numen.registerGear(new com.dwinovo.numen.core.gear.VanillaArmor());
         });
 
+        // 工具派道的统一入口（上游 CommonClass.registerTools 的位置与口径）：四个大脑工具
+        // （lua / skill / todo / memory）+ 本仓的世界工具进同一张 ToolRegistry，MCP 的
+        // tools/list 与内置大脑的系统提示都从这张表来。
+        ToolRunner.registerAll();
+
+        // 札记落点与技能根（上游在客户端 CompanionHome.init 做的两件；这一侧大脑在服务端，
+        // 按同一份 config/numen/ 布局放）。技能目录此刻是空的也没关系——扫一遍记着，rescan 再扫。
+        Path numenRoot2 = numenRoot;
+        com.dwinovo.numen.agent.memory.NoteBook.init(
+                companion -> numenRoot2.resolve("companions").resolve(companion.toString()).resolve("memory"),
+                () -> {
+                    MinecraftServer s = ToolRunner.current();
+                    return s == null ? 0 : (int) (s.overworld().getDayTime() / 24000L);
+                });
+        com.dwinovo.numen.agent.skill.SkillRegistry.instance().scan(
+                numenRoot2.resolve("skills"));
+
         // 任务排程机器的 lifecycle 接线（照搬上游 CommonClass.wireTaskMachine）：
         // 引擎自己也走同一条总线，和插件用的是同一套事件——没有「内部另有一条捷径」。
         CompanionEvents.subscribe(
@@ -149,6 +168,7 @@ public final class NumenCoreFabric implements ModInitializer {
 
         // 服务器起来的时候把配置里的缺口说清楚——比玩家发了消息才拿到一个 401 友好得多。
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
+            ToolRunner.bind(server);
             McpActuator.bind(server);
             String missing = NumenConfig.get().missingReason();
             if (missing == null) {
@@ -178,7 +198,10 @@ public final class NumenCoreFabric implements ModInitializer {
         // 服务器停了：属于那个世界的进程内状态一起作废（照搬上游 ServerLifecycleEvents.SERVER_STOPPED）。
         // 单人「退出存档」不结束进程，静态表会原封不动活到下一个存档——谁持有谁在自己那边
         // 报到，见 ServerLifecycle。
-        ServerLifecycleEvents.SERVER_STOPPED.register(server -> ServerLifecycle.fireStopped());
+        ServerLifecycleEvents.SERVER_STOPPED.register(server -> {
+            ToolRunner.unbind();
+            ServerLifecycle.fireStopped();
+        });
 
         // 主人登录：只排队，不在这儿恢复——JOIN 跑在原版 placeNewPlayer 内部，在这里出的任何
         // 异常都会打断主人的入场，客户端只看到「无效的玩家数据」（照搬上游注释）。

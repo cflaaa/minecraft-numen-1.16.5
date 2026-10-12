@@ -240,7 +240,7 @@ public final class McpActuator {
         if (companion == null || toolName == null || toolName.isBlank()) {
             return CompletableFuture.completedFuture(ToolOutcome.failure("companion 与 toolName 都是必填"));
         }
-        if (NumenTools.resolve(toolName) == null) {
+        if (!com.dwinovo.numen.core.agent.tool.ToolRunner.has(toolName)) {
             return CompletableFuture.completedFuture(ToolOutcome.failure("没有这个工具：" + toolName));
         }
         String args = (argsJson == null || argsJson.isBlank()) ? LlmToolCall.NO_ARGS : argsJson;
