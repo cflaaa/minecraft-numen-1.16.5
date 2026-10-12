@@ -59,9 +59,9 @@
 | 层 | 搬不搬 | 理由 |
 |---|---|---|
 | 客户端大脑（`agent/` 26 文件里的客户端那半） | ❌ 不搬 | 大脑在服务端（D-02） |
-| `program/` **传输半边**（8 文件） | ❌ 不搬 | 对端是客户端大脑，大脑不过去就没有对端 |
+| `program/` **传输半边**（8 文件） | ✅ **搬**（2026-10-11 改） | 服务端半边**直接依赖它**（`ServerPrograms` 用 `ClientCalls`/`ClientTransport`/`ModuleSet`/`NetworkTransport.INSTANCE`），不搬编不过 |
 | `program/` **服务端半边**（14 文件 / 1077 行） | ✅ **搬** | 程序管理与并发预算，与大脑在哪**无关**；`ProgramLimits` 是多人服必需品 |
-| `network/`（33 文件 / 2754 行） | ❌ 不搬 | 只有 2~3 处要落（见 Q-03），按 C 类登记 |
+| `network/`（33 文件 / 2754 行） | ✅ **搬**（2026-10-11 改） | 传输半边依赖 `Wire`/`ClientCallPayload` 等；随 `program/` 一起搬，**接缝归零** |
 | `platform/`（main 8 文件，含 `services/`） | ✅ **搬** | `ServerPrograms` 要 `ServerLifecycle`；`Services` 是平台抽象 |
 | `platform/`（client 侧 `ClientServices`） | ❌ 不搬 | 客户端侧 |
 | `sdk/ApiTester` | ❌ 不搬 | 依赖 `program` **传输半边** |
@@ -76,6 +76,14 @@
 ## 四、当前计划（执行看 v3）
 
 **`docs/RESTORE_PLAN_V3.md`（方案乙，2026-10-11 定）** —— 自包含执行版。
+
+> ⚠️ **2026-10-11 晚：方案乙被实测证伪，已改走方案甲（用户拍板）。**
+> 动手编译后发现 `program/` 的**服务端半边紧耦合传输半边**（`ServerPrograms` 直接用
+> `ClientCalls` / `ClientTransport` / `ModuleSet` / `NetworkTransport.INSTANCE` / `NumenNetwork`），
+> 而传输半边又依赖 `network/` 的 `Wire` / `ClientCallPayload`。按乙「只留 2 处接缝」编不过
+> （实测 35 个错全出在这条链上）。
+> **最终做法 = 方案甲**：`program/` 全部 22 文件 + `network/` 全部 33 文件都搬，**接缝归零**。
+> 本批实际规模 **137 文件 / 13082 行**（乙估 90/8814）。详见 `PORTING.md` §17.9。
 
 - **本批（刀 1a）**：90 文件 / 8814 行，全是 **D 类（缺口回补）**。
   构成：`sdk` 38/3718 · `task` 缺件 18/1705 · `program` 服务端半边 14/1077 · `script` 3/837 ·
@@ -103,7 +111,7 @@
 |---|---|---|---|
 | **Q-01** | `plugins/`（48 文件 / 5689 行）搬不搬？**它是上游 sdk 的对外出口**（`NumenPlugins.register`），A 计划说「内置插件 API 逐阶段补」。 | 先登记为**未决缺口**；等刀 1b 把 sdk 接通后，看 `NumenPlugins` 是否被 sdk 反向依赖再定。 | 🟡 待定 |
 | **Q-02** | `ui/`（32 文件 / 3891 行）搬不搬？还是把自绘 G 面板**正式登记为 C 类偏差**？ | 按 D-03（UI 允许不同、功能齐即可）+ 用户偏好「能用原版就用原版」→ **先登记 C 类**，收尾刀再评估搬 `ui/`。 | 🟡 待定 |
-| **Q-03** | `ServerPrograms.ownerLeft` 的 2 处接缝（`NetworkTransport.INSTANCE.ownerLeft`、`NumenNetwork.disconnected`）怎么落？ | **甲：删掉 + 一行注释**（改动最小；本仓无传输半边，分片消息本就不存在）。 | 🟡 待确认 |
+| ~~Q-03~~ | ~~`ServerPrograms.ownerLeft` 的 2 处接缝怎么落？~~ | **已作废**：走方案甲后 `network/` 与传输半边都搬，`ownerLeft` 照上游原样，**没有接缝**。 | ❌ 作废 |
 | **Q-04** | 计划外的整块缺口（`core/common` 的 `route`/`scan`/`build`/`combat`/`blueprint`/`debug`/`init`/`mixin`/`nav`、`api/common` 的 `agent`/`mixin`/`area`/`config`/`data`、`plugins`、`ui`）要不要补进计划？ | **补进缺口清单并逐条写明「搬 / 不搬 / 为什么」**，别让它们继续当隐形账。 | 🟡 待定 |
 | **Q-05** | `program/ProgramLimits` 搬进来**不等于生效**（上游靠主循环每刻查预算）——调用点要不要一并接？ | 要，列进刀 1b 第 4 项。 | 🟡 待做 |
 
@@ -116,6 +124,7 @@
 | 2026-10-11 | **D-01 ~ D-04 长期方针**由用户明确（默认按上游搬；大脑在服务端；UI 可不同但功能齐；先自写跑通再回头对齐） | 本文件 |
 | 2026-10-11 | 全量结构审计 → 结论「除大脑外还有 7 处偏离，**不符合仅移植**」；计划只覆盖约四成缺口 | `UPSTREAM_COMPARISON.md` §3 |
 | 2026-10-11 | 选**方案乙**，重订完整执行计划 v3（`program` 服务端半边纳入，接缝 3→2） | `RESTORE_PLAN_V3.md` |
+| 2026-10-11 | ⚠️ **方案乙被证伪** → 用户拍板改走**方案甲**（program 22 + network 33 全搬，接缝归零）；本批 137 文件 / 13082 行 | 本文件 §四、`PORTING.md` §17.9 |
 | 2026-10-11 | v2 合规自检：3 处接缝全不合规 → 发现「`program/` 不搬」口径太粗 | `RESTORE_PLAN_V2.md` §0 |
 | 2026-10-11 | 重订计划 v2（实测 sdk↔task **循环依赖**，阶段 1/2 合并；规模 69/7360） | `RESTORE_PLAN_V2.md` |
 | 2026-10-11 | 用户拍板 **A 计划 + 外接大脑**；README 状态表重写；纯原版客户端实测连通 | `D-05`/`D-06` |
@@ -134,5 +143,6 @@
 | `RESTORE_PLAN.md`（v1） | ❌ 历史 | v3（顶部有横幅） |
 | `RESTORE_PLAN_V2.md`（v2） | ❌ 过程稿 | v3 |
 | 「`program/` 不搬」这句口径 | ❌ 太粗 | 方案乙（只不搬传输半边） |
+| **方案乙**（`program/` 只搬服务端半边 + `network/` 不搬） | ❌ **实测编不过** | **方案甲**（program 22 + network 33 全搬，接缝归零） |
 | 「先 sdk 后 task」的顺序 | ❌ 写反 | sdk↔task 循环依赖，必须同批搬 |
 | 「接缝 3：tick 驱动」 | ❌ 我写错 | 照搬上游 `CompanionTickDispatcher` 即可，无需接缝 |

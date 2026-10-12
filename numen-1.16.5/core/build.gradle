@@ -18,6 +18,9 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
     options.release = 17
+    // javac 默认报满 100 条就停。移植期一轮能报出上百条 API 差异，
+    // 分批看不到全貌——把上限抬到 1000，一轮就能把同类错误一次看全。
+    options.compilerArgs += ['-Xmaxerrs', '1000']
 }
 
 dependencies {

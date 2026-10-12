@@ -93,6 +93,9 @@ public final class ModLanguageData {
         adder.add(Keys.COMMAND_RULE_EXISTS, "%s already has: %s");
         adder.add(Keys.COMMAND_RULE_NO_ROW, "%s has no row %s (it has %s); /numen permission rules list shows the numbers");
         adder.add(Keys.COMMAND_RULE_REMOVED, "Removed from %s: %s");
+        adder.add(Keys.NOTICE_TIMER, "\u23f1 %s: in %s s \u2014 %s");
+        adder.add(Keys.NOTICE_CREATIVE_NEEDS_OP, "[Numen] Creative mode needs cheats or OP; set to Survival");
+        adder.add(Keys.NOTICE_NAME_TAKEN, "[Numen] The name \"%s\" is taken by a player who is online; pick another");
         adder.add(Keys.COMMAND_RULES_RESET, "Cleared your deny, ask and allow tables; the factory rules still apply");
     }
 
@@ -153,6 +156,9 @@ public final class ModLanguageData {
         adder.add(Keys.COMMAND_RULE_EXISTS, "%s 里已经有:%s");
         adder.add(Keys.COMMAND_RULE_NO_ROW, "%s 没有第 %s 行(一共 %s 行);行号用 /numen permission rules list 看");
         adder.add(Keys.COMMAND_RULE_REMOVED, "已从 %s 删掉:%s");
+        adder.add(Keys.NOTICE_TIMER, "\u23f1 %s:%s 秒后 \u2014\u2014 %s");
+        adder.add(Keys.NOTICE_CREATIVE_NEEDS_OP, "[Numen] 创造档需要作弊/OP 权限,已按生存");
+        adder.add(Keys.NOTICE_NAME_TAKEN, "[Numen] 名字\u300c%s\u300d已被在线玩家占用,换一个吧");
         adder.add(Keys.COMMAND_RULES_RESET, "清空了你的 deny、ask、allow 三张表;出厂规则照旧生效");
     }
 
@@ -215,5 +221,11 @@ public final class ModLanguageData {
         public static final String COMMAND_RULE_NO_ROW    = "numen.command.permission.rule_no_row";
         public static final String COMMAND_RULE_REMOVED   = "numen.command.permission.rule_removed";
         public static final String COMMAND_RULES_RESET    = "numen.command.permission.rules_reset";
+
+        // ==================== 播报（定表 / 创造档 / 重名） ====================
+
+        public static final String NOTICE_TIMER             = "numen.notice.timer";
+        public static final String NOTICE_CREATIVE_NEEDS_OP = "numen.notice.creative_needs_op";
+        public static final String NOTICE_NAME_TAKEN        = "numen.notice.name_taken";
     }
 }

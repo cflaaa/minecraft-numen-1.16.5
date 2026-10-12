@@ -40,7 +40,16 @@ public final class CompanionFactory {
      * @return 已经进入玩家列表的身体
      */
     public static NumenPlayer spawn(MinecraftServer server, ServerLevel level, UUID ownerUuid, String name) {
-        GameProfile profile = new GameProfile(offlineUuid(name), name);
+        UUID companionUuid = offlineUuid(name);
+        GameProfile profile = new GameProfile(companionUuid, name);
+        // 借来的正版皮肤(Mojang 签名的 textures,注册表持久化)注入档案——客户端只认
+        // 签过名的皮肤数据;没有则回落原版默认皮肤(按 UUID 哈希抽取)。上游的注入点
+        // 就在这里:所有出生路径共用一处,从注册表读。
+        CompanionRegistry.Entry reg = CompanionRegistry.get(server).find(companionUuid);
+        if (reg != null && !reg.skinValue().isEmpty()) {
+            profile.getProperties().put("textures", new com.mojang.authlib.properties.Property(
+                    "textures", reg.skinValue(), reg.skinSig().isEmpty() ? null : reg.skinSig()));
+        }
         NumenPlayer body = new NumenPlayer(server, level, profile);
         body.setOwnerUuid(ownerUuid);
 

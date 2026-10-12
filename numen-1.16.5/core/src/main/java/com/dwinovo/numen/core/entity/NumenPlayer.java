@@ -7,11 +7,16 @@ import com.dwinovo.numen.pathing.body.Controls;
 import com.dwinovo.numen.pathing.body.Physics;
 import com.dwinovo.numen.pathing.body.PlayerHands;
 import com.mojang.authlib.GameProfile;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Registry;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerPlayerGameMode;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 
 import java.util.UUID;
 
@@ -56,6 +61,9 @@ public final class NumenPlayer extends ServerPlayer implements Body {
      * 每次导航现建一双的话，走路走到一半换个动作就会把进度清零。
      */
     private PlayerHands hands;
+
+    /** 她这一侧的假客户端：原版交互回路（{@code ServerGamePacketListenerImpl} 那一套）要的那份「客户端」。 */
+    private final FakeClient fakeClient = new FakeClient(this);
 
     /**
      * 挂在这具身体上的同伴级状态,按类型各一份(征询登记处、等主人答复的调用之类)。
@@ -225,6 +233,203 @@ public final class NumenPlayer extends ServerPlayer implements Body {
         return hands;
     }
 
+    // ─────────────────── 背包满了播报（上游 NumenPlayer 里同一段，逐字搬）───────────────────
+
+    /** 这一轮「背包满了」已经说过了。背包满是持续状态，掉落物每刻都在碰她——不去抖就是每刻一条；背包里又有空格了才重新武装。 */
+    private boolean fullReported;
+
+    /** 因背包放不下而留在地上、还没说出去的那一件；没有是 null。 */
+    private LeftBehind leftBehind;
+
+    /** 一件因背包放不下而留在地上的东西：是什么、在哪一格。 */
+    public record LeftBehind(ItemStack stack, BlockPos pos) {}
+
+    /**
+     * 一件掉落物碰到了她，原版正要往背包里放（由 {@code ItemEntityTouchMixin} 交来）。放不放得下照原版背包找格子的两步：
+     * 有一格还能叠上它（{@code getSlotWithRemainingSpace}），或者有空格（{@code getFreeSlot}）；创造模式什么都收。
+     * 放不下的记下来，由 {@link #pollInventoryFull} 交出去。「满了」只在这里判：挖、捡、合成这些活不各自判。
+     */
+    public void touchedItem(ItemEntity item) {
+        if (fullReported || leftBehind != null || abilities.instabuild) {
+            return;
+        }
+        Inventory inventory = this.inventory;
+        ItemStack stack = item.getItem();
+        if (inventory.getSlotWithRemainingSpace(stack) != -1 || inventory.getFreeSlot() != -1) {
+            return;
+        }
+        leftBehind = new LeftBehind(stack.copy(), item.blockPosition());
+    }
+
+    /**
+     * 这一刻该不该跟主人说「背包满了、东西留在了地上」。每服务端 tick 问一次（见 {@code CompanionTickDispatcher}）。
+     * <b>一轮只说一次</b>，复位见 {@link #rearmInventoryFull}。
+     */
+    public LeftBehind pollInventoryFull() {
+        if (leftBehind == null) {
+            return null;
+        }
+        LeftBehind told = leftBehind;
+        leftBehind = null;
+        fullReported = true;
+        return told;
+    }
+
+    /**
+     * 背包里又有了空格就重新武装：有空格就什么都放得下，下一回再满、再有东西放不下时再说；还没说出去的那一件也作废。
+     * 在自己的实体刻里、捡东西之前看——腾出的那一格要是这一刻就被捡起的东西占上，事后再看就看不见它空过。
+     */
+    private void rearmInventoryFull() {
+        if (inventory.getFreeSlot() != -1) {
+            fullReported = false;
+            leftBehind = null;
+        }
+    }
+
+    // ─────────── 饥饿 / 醒来 / 主人挨打 / 本能暂停（上游 NumenPlayer 的同一段，逐字搬）───────────
+
+    /** 上一刻她在不在床上，{@link #pollWokeUp} 用它比出「刚醒」这一刻。 */
+    private boolean sleepingLastTick;
+
+    /** 这一轮「我饿了」已经说过了。回到 {@link #FED_LEVEL} 以上才重新武装。 */
+    private boolean hungerReported;
+
+    /** 饿到这个数以下才值得说。 */
+    private static final int HUNGRY_LEVEL = 6;
+
+    /** 吃回这个数以上才重新武装（迟滞，免得在阈值上一条接一条）。 */
+    private static final int FED_LEVEL = 14;
+
+    /** 被任务按住的本能。按住是临时的，{@link #resumeAllReflexes} 一次全解除。 */
+    private java.util.Set<String> pausedReflexes = java.util.Set.of();
+
+    /** 主人血量的看护（纯判定在 {@link OwnerHurtWatch}，便于无头单测）。 */
+    private final OwnerHurtWatch ownerWatch = new OwnerHurtWatch();
+
+    /** 一次「主人挨打」报告：攻击者、血量与档位（urgent = 跌进危险区）。 */
+    public record OwnerHurt(String attacker, float hp, float maxHp, boolean urgent) {}
+
+    /**
+     * 她是不是<b>刚好在这一刻</b>从床上醒了。每服务端 tick 问一次（见 {@code CompanionTickDispatcher}）。
+     * 死着的时候不算醒——原版 {@code LivingEntity.die} 会先把睡眠停掉，不挡的话她每次死在床上都会多出一条
+     * 「你醒了」贴在死亡事件旁边。
+     */
+    public boolean pollWokeUp() {
+        if (!isAlive()) {
+            sleepingLastTick = false;
+            return false;
+        }
+        boolean now = isSleeping();
+        boolean woke = sleepingLastTick && !now;
+        sleepingLastTick = now;
+        return woke;
+    }
+
+    /**
+     * 这一刻该不该跟主人说「我饿了」。<b>一轮饥饿只说一次</b>：说过就闭嘴，吃回 {@link #FED_LEVEL}
+     * 以上才重新武装。她<b>不会自己吃</b>——饿了是主人该知道的事，交互本身就是目的。
+     */
+    public boolean pollGotHungry() {
+        int food = getFoodData().getFoodLevel();
+        if (food >= FED_LEVEL) {
+            hungerReported = false;
+            return false;
+        }
+        if (food > HUNGRY_LEVEL || hungerReported || !isAlive()) {
+            return false;
+        }
+        hungerReported = true;
+        return true;
+    }
+
+    /**
+     * 主人这一刻有没有挨打值得说。每服务端 tick 问一次；主人不在线传 null，基线即重置。
+     * 只报实体攻击，分档与去抖全在 {@link OwnerHurtWatch}。
+     *
+     * <p><b>1.16.5 差异</b>：上游用 {@code owner.getLastDamageSource().getEntity()}；这一代
+     * {@code Entity} 没有 {@code getLastDamageSource()}，改用 {@code LivingEntity.getLastHurtByMob()}
+     * （同一语义：最近一次伤害的实体攻击者）。
+     */
+    public OwnerHurt pollOwnerHurt(ServerPlayer owner, long now) {
+        if (owner == null) {
+            ownerWatch.reset();
+            return null;
+        }
+        net.minecraft.world.entity.LivingEntity attacker = owner.getLastHurtByMob();
+        OwnerHurtWatch.Verdict verdict = ownerWatch.poll(
+                owner.getUUID(), owner.getHealth(), attacker != null, now);
+        if (verdict == OwnerHurtWatch.Verdict.NONE) {
+            return null;
+        }
+        String label = attacker instanceof net.minecraft.world.entity.player.Player p
+                ? p.getGameProfile().getName()
+                : Registry.ENTITY_TYPE.getKey(attacker.getType()).getPath();
+        return new OwnerHurt(label, owner.getHealth(), owner.getMaxHealth(),
+                verdict == OwnerHurtWatch.Verdict.DANGER);
+    }
+
+    /** 按住一条本能。见 {@link #pausedReflexes}。 */
+    public void pauseReflex(String reflexId) {
+        if (pausedReflexes.contains(reflexId)) {
+            return;
+        }
+        java.util.Set<String> next = new java.util.HashSet<>(pausedReflexes);
+        next.add(reflexId);
+        pausedReflexes = java.util.Set.copyOf(next);
+    }
+
+    /** 这条本能这一刻被按住了吗。 */
+    public boolean reflexPaused(String reflexId) {
+        return pausedReflexes.contains(reflexId);
+    }
+
+    /** 她闲下来了，全部解除——按住是临时的，不必谁去显式还。 */
+    public void resumeAllReflexes() {
+        pausedReflexes = java.util.Set.of();
+    }
+
+    /** 她这一侧的假客户端（原版交互回路要的那份「客户端」）。 */
+    public FakeClient fakeClient() {
+        return fakeClient;
+    }
+
+    // ─────────── 用坏的装备（上游 NumenPlayer 的同一段，BodyDelta 要）───────────
+
+    /** 一件在她身上用坏的装备：是什么、坏在哪个装备位。 */
+    public record BrokenGear(net.minecraft.world.item.Item item,
+                             net.minecraft.world.entity.EquipmentSlot slot) {}
+
+    /** 最近用坏的装备，按先后；只留最近 {@link #BROKEN_KEPT} 件。 */
+    private final java.util.ArrayList<BrokenGear> brokenGear = new java.util.ArrayList<>();
+    /** 到现在一共用坏过几件：{@link #brokenGearMark} 读它，{@link #brokenGearSince} 拿它算新坏的是哪几件。 */
+    private long brokenGearTotal;
+    private static final int BROKEN_KEPT = 16;
+
+    /**
+     * 原版装备耐久耗尽、碎掉的那一刻（挖掘、打击、盾挡、鞘翅……都经 {@code ItemStack.hurtAndBreak} 到这里）。
+     * 记下来，干活的人事后用 {@code BodyDelta} 说给她听；这里只记流水，不替谁下结论。
+     */
+    @Override
+    public void broadcastBreakEvent(net.minecraft.world.entity.EquipmentSlot slot) {
+        super.broadcastBreakEvent(slot);
+        if (brokenGear.size() == BROKEN_KEPT) {
+            brokenGear.remove(0);
+        }
+        brokenGear.add(new BrokenGear(getItemBySlot(slot).getItem(), slot));
+        brokenGearTotal++;
+    }
+
+    /** 此刻用坏过几件的读数；之后问 {@link #brokenGearSince} 就是这个读数以来新坏的。 */
+    public long brokenGearMark() {
+        return brokenGearTotal;
+    }
+
+    /** 读数 {@code mark} 以来用坏的装备，按先后。 */
+    public java.util.List<BrokenGear> brokenGearSince(long mark) {
+        int fresh = (int) Math.min(brokenGearTotal - mark, brokenGear.size());
+        return java.util.List.copyOf(brokenGear.subList(brokenGear.size() - fresh, brokenGear.size()));
+    }
+
     @Override
     public void tick() {
         // 假玩家死了不会被自动移出玩家列表（没有客户端来发重生包），会永远躺在 0 血。
@@ -234,6 +439,7 @@ public final class NumenPlayer extends ServerPlayer implements Body {
             Companions.onDeath(this);
             return;
         }
+        rearmInventoryFull();
 
         try {
             super.tick();

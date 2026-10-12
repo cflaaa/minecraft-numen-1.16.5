@@ -76,4 +76,14 @@ public record TaskResult(boolean success, String message, Object value, ErrorKin
     public boolean interrupted() {
         return kind == ErrorKind.INTERRUPTED;
     }
+
+    /**
+     * 这次结局被 {@code cause} 叫停的版本：同一份结果，消息前挂上叫停的原因。
+     *
+     * <p>第一刀搬本类时 {@code TaskRecord} 还没到位，这个方法被暂时去掉；现在 {@code TaskRecord}
+     * 随刀 1a 到位了，按上游补回（`UPSTREAM_COMPARISON.md` §2 注里记的那一处）。
+     */
+    public TaskResult stoppedBy(TaskRecord.StopCause cause) {
+        return new TaskResult(success, cause.words() + " — " + message, value, kind, hint);
+    }
 }
