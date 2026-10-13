@@ -4,7 +4,7 @@
 > 之后的修改、更新、修 bug 同样要在实际测试完成后及时记录进来（2026-10-12 拍板）。
 > 分工：决策看 `DECISIONS.md`，技术细节与踩坑看 `PORTING.md`（引用 §号），执行计划看 `RESTORE_PLAN_V3.md`。
 
-**最后更新**：2026-10-13（保存方式整改 + **可复用脚本入 `tools/` 入库** + 进度复点 + 问题清单）
+**最后更新**：2026-10-13（保存方式整改 + 脚本入 `tools/` + mine 修复 + **台账理顺：刀5实为重接**）
 
 ---
 
@@ -21,9 +21,11 @@
   搬运/重映射/分析 9 个 + 环境 A/B e2e 验收 8 个 + NAS 部署 3 个 + `nas_creds.py`（凭据读取器）。
   **NAS 口令不再写死**（`nas_creds` 三级回退：`NUMEN_NAS_*` → 本机私有 `ssh-run.py` → `.nas-creds.env`）。
   提交 `d6abbdb`；细则见 `GIT_SAFETY.md` R4。
-- **下一步**：刀 5 收尾——`mine` 生存模式挖不动**已修**（PORTING §19：`handleBlockBreakAction`
-  第 4 参误传 0，应为 `body.getServer().getMaxBuildHeight()`；真机 `accept5` 5-10 ✅ 真挖掉一格）；
-  剩 11 处「合并 jar 有、服务端 jar 没有」待逐条判可达性（`UPSTREAM_COMPARISON.md` §4.4）。
+- **当前**：刀 **5（收尾）进行中**。这次刀 5 的实体是「**11 个世界工具改上游 `@Fn` 驱动**，删自写
+  NumenTools/Acts/CompanionNav」（提交 `a9a0116`），验收扫出并已修：3 处 `NoSuchMethodError`（`76c2f24`）、
+  `mine` 生存挖不动（`5fb61d1`，PORTING §19）。**已逐条 javap 核真**：剩 **7 处真·潜伏崩溃待修**
+  （FakeClient 换维度/回传聊天、爬行者/远程/合成/建造/Lua 查注册表，§4.4 条2）+ 2 处待现场确认；余者已排除误报。
+- **下一步**：修那 7 处潜伏崩溃 → 刀 6（清理：导航壳/G面板/MCP 版本漂移/server-api-check/文档）→ ui/plugins 缺口（见 §4）。
   **进度复点见 `UPSTREAM_COMPARISON.md` §4**（core+api 96%、ui/plugins 两大整模块缺口）。
 
 ## 二、刀进度总表
@@ -35,7 +37,8 @@
 | 2 | Wardrobe 穿脱（VanillaArmor / FailureType） | `a7dedeb` | ✅ 全绿 | `gear-e2e.py` 全过 | ✅ 完成 |
 | 3 | 工具替换 / ToolRunner 统一派发 | `311b2e2` | ✅ 全绿 | `tool-reg-e2e.py` 全过 | ✅ 完成 |
 | 4 | 13 任务族 + tools + scan/route/nav/area/blueprint/combat/act/init 替换 `Acts.java` | （本次提交） | ✅ 全绿 | `smoke/enum/accept4-刀4.py` 全过（真机抓出 3 缺陷当场修） | ✅ 完成 |
-| 5 | 清理（导航壳 / G 面板与 MCP 版本漂移 / server-api-check / 文档） | — | — | — | ⬜ 未开始 |
+| 5 | **收尾**：11 个世界工具改上游 `@Fn` 驱动，删自写 NumenTools/Acts/CompanionNav | `a9a0116`+`76c2f24`+`5fb61d1` | ✅ 全绿 | `accept5`：11 工具产品侧全过；3 壳/mine 已修；**剩 7 处潜伏崩溃待修**（§4.4 条2） | 🔵 进行中 |
+| 6 | 清理（导航壳 / G 面板与 MCP 版本漂移 / server-api-check / 文档） | — | — | — | ⬜ 未开始 |
 
 ## 三、已实现能力明细（按刀）
 
@@ -181,5 +184,5 @@ JAVA_HOME="../.toolchain/jdk-17.0.20.1+1" ../.toolchain/gradle-7.6.4/bin/gradle 
 本仓当前暴露 **15 个工具**（4 大脑 + 11 世界：say/get_status/inspect_block/scan_blocks/goto/mine/
 use_block/inventory/equip/eat/drop），MCP `tools/list` **19 个**。→ 功能面约 **28%**，缺口同样是 13 任务族。
 
-**一句话**：按 Fabric 可用代码量算，**已完成原版约 9 成**；引擎与寻路 100%、适配层与任务族（刀 4）已落地，
-剩下的主要是 `ui/`、`plugins/` 两个整缺口（Q-02 / Q-01）与刀 5 清理收尾。
+**一句话**：按 Fabric 可用代码量算，**已完成原版约 9 成**；引擎与寻路 100%、适配层与任务族（刀 4）已落地、工具层正按上游 `@Fn` 收尾（刀 5），
+剩下的主要是 `ui/`、`plugins/` 两个整缺口（Q-02 / Q-01）与刀 6 清理、刀 5 剩的 7 处潜伏修复。
