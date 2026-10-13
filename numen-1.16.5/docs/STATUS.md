@@ -16,7 +16,9 @@
 - **构建**：`:core:build` 绿（含 527 单测 0 失败）；发行 jar **961 类 = core 726 + pathing 235**
   （刀 5 删 NumenTools/Acts/CompanionNav 后由 968 降至此，属预期）；五件套嵌入
   （agent / ai / lua / slf4j-api 1.7.36 / log4j-slf4j-impl 2.8.1）。
-- **下一步**：刀 5 收尾（改造已完成并落 WIP `a9a0116`，**待真机验收**）→ 验收后压成正式刀提交。
+- **下一步**：刀 5 收尾（改造已真机验收：11 个世界工具逐一真机直调，**8 个直接通过**，3 个是验收脚本断言写错）；
+  剩 1 个真问题（`mine` 生存模式渐进挖掘的服务端进度判定）+ 11 处「合并 jar 有、服务端 jar 没有」待逐条判可达性。
+  详见 `UPSTREAM_COMPARISON.md` §4.4。
   **进度复点见 `UPSTREAM_COMPARISON.md` §4**（core+api 96%、ui/plugins 两大整模块缺口）。
 
 ## 二、刀进度总表

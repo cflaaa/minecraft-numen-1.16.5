@@ -276,7 +276,18 @@
 
 ## 4.4 已知问题（2026-10-13）
 
-1. **刀 5 @Fn 收尾未真机验收**（WIP 提交 `a9a0116`）：世界工具改走上游 `numen.*`，编译绿但真机未回归。
+1. **刀 5 已真机验收（2026-10-13，`76c2f24`）**：11 个世界工具逐一真机直调，**8 个直接通过**
+   （say/get_status/inventory/scan_blocks/inspect_block/drop/use_block/goto）；另 3 个经查是**验收脚本断言写错**
+   （equip 回 `no diamond_helmet`、eat 回 `already full` 都是上游正确报错）。
+   **仍有一个真问题**：`mine` 的生存模式渐进挖掘——`PlayerHands` 本地累计满进度后送 STOP，
+   但 1.16.5 `ServerPlayerGameMode` 的服务端进度判定没过，回「服务器没让挖掉这一格」，需后续对齐。
+2. **「合并 jar 有、服务端 jar 没有」仍剩 11 处**（`server-api-check.py` 复跑，已修掉 3 处）：
+   `class_1548.method_6872`、`class_1675.method_18075`、`class_1690.method_7535`、`class_1856.method_8105`、
+   `class_2248.method_9518/9574`、`class_2348.method_10250`、`class_2378.iterator()`、
+   `class_2635.method_11388`、`class_2708.method_11737`、整类 `class_310`。
+   其中 `class_2378.iterator()` 是**误报**（Iterable 继承，脚本父类链解析的限制）；
+   `class_310` 是客户端 Minecraft 类。其余需逐条判可达性——真机 8/11 通过说明常用路径不碰它们，
+   但换路径（掉落追踪、方块拾取、实体显示名）就可能踩到。
 2. **`scan_blocks` 语义变更**：原「扫全方块统计数量」→ `numen.scan.map`（地形俯视图）；按 id 找矿改用 Lua `numen.scan.blocks`。
 3. **21 个反编译恢复的文件无注释**（`core.build`、`core.task.build`，见提交 `32c2280`）——逻辑与刀 4 一致，可读性差，待补注释。
 4. `server-api-check.py` 报 12 处「专用服务端可能炸」，疑似把客户端包类引用误计入（输出自相矛盾），**未细查**。
