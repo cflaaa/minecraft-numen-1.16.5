@@ -276,11 +276,11 @@
 
 ## 4.4 已知问题（2026-10-13）
 
-1. **刀 5 已真机验收（2026-10-13，`76c2f24`）**：11 个世界工具逐一真机直调，**8 个直接通过**
-   （say/get_status/inventory/scan_blocks/inspect_block/drop/use_block/goto）；另 3 个经查是**验收脚本断言写错**
-   （equip 回 `no diamond_helmet`、eat 回 `already full` 都是上游正确报错）。
-   **仍有一个真问题**：`mine` 的生存模式渐进挖掘——`PlayerHands` 本地累计满进度后送 STOP，
-   但 1.16.5 `ServerPlayerGameMode` 的服务端进度判定没过，回「服务器没让挖掉这一格」，需后续对齐。
+1. **刀 5 已真机验收（2026-10-13，`76c2f24` + `5fb61d1`）**：11 个世界工具逐一真机直调，**11/11 产品侧全过**
+   （say/get_status/inventory/scan_blocks/inspect_block/equip/drop/eat/use_block/mine/goto；
+   equip 回 `no diamond_helmet`、eat 回 `already full` 是上游正确报错，不是断言失败）。
+   **`mine` 生存模式挖不动已修**（PORTING §19：`handleBlockBreakAction` 第 4 参误传 0，应为
+   `body.getServer().getMaxBuildHeight()`）；真机 `accept5` 5-10 ✅ `{"dug":1,"left":0}`。
 2. **「合并 jar 有、服务端 jar 没有」仍剩 11 处**（`server-api-check.py` 复跑，已修掉 3 处）：
    `class_1548.method_6872`、`class_1675.method_18075`、`class_1690.method_7535`、`class_1856.method_8105`、
    `class_2248.method_9518/9574`、`class_2348.method_10250`、`class_2378.iterator()`、
@@ -291,5 +291,6 @@
 2. **`scan_blocks` 语义变更**：原「扫全方块统计数量」→ `numen.scan.map`（地形俯视图）；按 id 找矿改用 Lua `numen.scan.blocks`。
 3. **21 个反编译恢复的文件无注释**（`core.build`、`core.task.build`，见提交 `32c2280`）——逻辑与刀 4 一致，可读性差，待补注释。
 4. `server-api-check.py` 报 12 处「专用服务端可能炸」，疑似把客户端包类引用误计入（输出自相矛盾），**未细查**。
-5. jar 类数基线 968 → **961**（刀 5 删 NumenTools/Acts/CompanionNav 的预期结果）。
+5. jar 类数基线 968 → **962**（刀 5 删 NumenTools/Acts/CompanionNav 后 961，core 727 是事故反编译恢复后的实际值；
+   pathing 235 未丢）。
 6. **刀 5 的 9 条改动已落 WIP**，按 D-10 R2 需在验收后 `reset --soft` 压成一个正式刀提交。
