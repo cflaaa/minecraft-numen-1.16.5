@@ -13,16 +13,17 @@
 - **策略**：方案甲 —— 上游文件逐字照搬，只在 1.16.5 API 真不同处适配（A类照搬 / B类适配）。
 - **已落地**：刀 1a / 1b / 2 / 3 / **4** 全部提交并真机验收；工作树干净。
 - **双环境验收**：环境A（本机 `.testserver/` 完整回归）✅；**环境B（NAS 真实部署 + 跨机原版客户端）✅**（2026-10-13）。
-- **构建**：`:core:build` 绿（含 527 单测 0 失败）；发行 jar **961 类 = core 726 + pathing 235**
-  （刀 5 删 NumenTools/Acts/CompanionNav 后由 968 降至此，属预期）；五件套嵌入
+- **构建**：`:core:build` 绿（含 527 单测 0 失败）；发行 jar **962 类 = core 727 + pathing 235**
+  （刀 5 删 NumenTools/Acts/CompanionNav 后由 968 降至此；core 727 是事故反编译恢复后的实际值，
+  pathing 235 未丢——loom 0.12 跨项目 remapper 的老坑仍靠 `remapperIsolation` 压住）；五件套嵌入
   （agent / ai / lua / slf4j-api 1.7.36 / log4j-slf4j-impl 2.8.1）。
 - **脚本入库（R4）**：可复用脚本已从被忽略的 `.workbuddy-ai/tmp/` 搬进 **`tools/` 入库**——
   搬运/重映射/分析 9 个 + 环境 A/B e2e 验收 8 个 + NAS 部署 3 个 + `nas_creds.py`（凭据读取器）。
   **NAS 口令不再写死**（`nas_creds` 三级回退：`NUMEN_NAS_*` → 本机私有 `ssh-run.py` → `.nas-creds.env`）。
   提交 `d6abbdb`；细则见 `GIT_SAFETY.md` R4。
-- **下一步**：刀 5 收尾（改造已真机验收：11 个世界工具逐一真机直调，**8 个直接通过**，3 个是验收脚本断言写错）；
-  剩 1 个真问题（`mine` 生存模式渐进挖掘的服务端进度判定）+ 11 处「合并 jar 有、服务端 jar 没有」待逐条判可达性。
-  详见 `UPSTREAM_COMPARISON.md` §4.4。
+- **下一步**：刀 5 收尾——`mine` 生存模式挖不动**已修**（PORTING §19：`handleBlockBreakAction`
+  第 4 参误传 0，应为 `body.getServer().getMaxBuildHeight()`；真机 `accept5` 5-10 ✅ 真挖掉一格）；
+  剩 11 处「合并 jar 有、服务端 jar 没有」待逐条判可达性（`UPSTREAM_COMPARISON.md` §4.4）。
   **进度复点见 `UPSTREAM_COMPARISON.md` §4**（core+api 96%、ui/plugins 两大整模块缺口）。
 
 ## 二、刀进度总表
@@ -128,7 +129,7 @@ JAVA_HOME="../.toolchain/jdk-17.0.20.1+1" ../.toolchain/gradle-7.6.4/bin/gradle 
 ```
 
 - 发行 jar：`core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar`
-- **类数基线：968 = core 733 + pathing 235**（改完 pathing 必须 clean 重建并逐个比对，防 loom 0.12 跨项目共享 TinyRemapper 丢类）
+- **类数基线：962 = core 727 + pathing 235**（改完 pathing 必须 clean 重建并逐个比对，防 loom 0.12 跨项目共享 TinyRemapper 丢类）
 - 嵌入五件套：agent / ai / lua / slf4j-api 1.7.36 / log4j-slf4j-impl 2.8.1
 - maven.fabricmc.net 抖动报 `Could not download` → 直接重跑即可。
 

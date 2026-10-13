@@ -1886,4 +1886,51 @@ game += ["--proxyHost", "127.0.0.1", "--proxyPort", "1"]   # 死代理 → 认�
 实际它只是**并发的日志锁问题**：已在脚本里补「启动前清场 + 失败分支也 kill + 失败自动 dump 线程栈」，
 但它**不是**不自动进服的原因 —— 真凶是 §18.2。
 
+## 十九、刀 5 收尾：`mine` 生存模式挖不动 —— 第 4 参传了 0（2026-10-13）
+
+### 19.1 现象
+刀 5 把 `PlayerHands` 的挖掘从「new 客户端包」改成「直调服务端入口 `handleBlockBreakAction`」后（§十七 抓的
+`NoSuchMethodError` 之一），**创造模式挖得动，生存模式卡死**：本地 `progress` 按
+`getDestroyProgress` 累到 1、送了 `STOP_DESTROY_BLOCK`，可方块就是不掉、同伴 busy 挂死。
+
+### 19.2 真凶：第 4 参是「建筑高度上限」，不是序号
+反编译 1.16.5 服务端 `ServerPlayerGameMode.handleBlockBreakAction(BlockPos, Action, Direction, int)`：
+
+```java
+if (blockPos.getY() >= i) {          // i = 建筑高度上限
+    this.player.connection.send(new ClientboundBlockBreakAckPacket(..., false, "too high"));
+    return;                           // 直接回拒，不挂破坏进度
+}
+```
+
+`ServerGamePacketListenerImpl.handlePlayerAction` 里服务端**真客户端**传的是
+`this.server.getMaxBuildHeight()`（默认 256）。我们的假玩家 `send()` 之前写的是：
+
+```java
+body.gameMode.handleBlockBreakAction(pos, action, face, 0);   // ← 错：0
+```
+
+传 0 时，**任何 y ≥ 0 的格都满足 `y >= 0`** → 服务端对每一格 START/STOP 都回 "too high" 拒绝，
+不进入 `isDestroyingBlock` 分支，服务端从不在它的钟里累加进度 → 方块永远不碎。
+创造模式不受影响（`isCreative()` 分支在高度检查之后……实际是它走 `destroyAndAck` 直接碎，绕过了这段）。
+
+### 19.3 修法（已 javap 核）
+```java
+body.gameMode.handleBlockBreakAction(pos, action, face, body.getServer().getMaxBuildHeight());
+```
+- `getMaxBuildHeight()` **在 `MinecraftServer` 上**（返回 `this.maxBuildHeight`），**不在**
+  `Player`/`Mob`/`Entity` 上（javap 逐类核过）。
+- `ServerPlayer` 没有 `getServer()` 方法，但有个 **public final 字段 `server`**；更稳妥走
+  `Entity.getServer()`（javap 确认在 `Entity` 上，返回 `MinecraftServer`）。
+  故用 `body.getServer().getMaxBuildHeight()`。
+
+### 19.4 验证
+`:core:build` 绿（含 527 单测）；clean 重建 jar 逐个比对 **pathing 235 不丢**（loom 0.12 跨项目
+remapper 的老坑用 `remapperIsolation` 压住，pathing 没被裁）；真机 `accept5.py` **5-10 `mine` ✅
+`{"dug":1,"left":0}`**——生存模式真挖掉了一格 grass_block。5-6/5-8 的「未过」是脚本断言写错
+（equip 无钻石盔、eat 已吃饱，都是上游正确报错），非产品问题。
+
+> 同类教训再记一笔：直调服务端入口时，**包的每个字段都要按服务端真客户端传的值填**，不能想当然塞 0/常量。
+> 上次栽在「合并 jar 有、服务端 jar 没有」的成员上，这次栽在「参数语义搞错」上——都是编译期看不出的坑。
+
 

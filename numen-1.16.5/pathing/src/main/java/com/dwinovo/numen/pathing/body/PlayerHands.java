@@ -189,9 +189,13 @@ public final class PlayerHands implements Effector {
      * 「客户端+服务端」合并 jar** 里，**专用服务端 jar 经 ProGuard 裁剪后没有它**（该包只由客户端构造发送）——
      * 照它写就是「编译过、一跑就 NoSuchMethodError」（本项目已栽过多次同一类坑）。
      * 改为直接调 {@code handleBlockBreakAction}：服务端收到包时走的就是它，行为一致。
+     *
+     * <p>⚠️ 1.16.5 的 {@code handleBlockBreakAction(pos, action, face, int)} 第 4 参是**建筑高度上限**
+     * （原版客户端包里的 {@code player.getMaxBuildHeight()}），**不是**序号。传 0 会让服务端认为每一格都
+     * "too high"（所有 y ≥ 0 都 ≥ 0）→ 立即回拒，方块永远不碎。
      */
     private void send(ServerboundPlayerActionPacket.Action action, BlockPos pos, Direction face) {
-        body.gameMode.handleBlockBreakAction(pos, action, face, 0);
+        body.gameMode.handleBlockBreakAction(pos, action, face, body.getServer().getMaxBuildHeight());
     }
 
     // ==================== 右键 ====================
