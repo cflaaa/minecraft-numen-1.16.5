@@ -228,3 +228,57 @@
    那 `plugins/` 到底搬不搬？这是**第 3 个要拍板的事**（前两个是 tick 驱动与事件去向，已定）。
 3. **`ui/` 与 G 面板**：用户偏好是「能用原版就用原版」。要么搬 `ui/`(32 文件)，要么把自绘 G 面板
    正式登记为 C 类偏差并写清理由。
+
+
+---
+
+# 4. 现状复点（2026-10-13 下午，脚本实测）
+
+> ⚠️ **上面 §1~§3 是 2026-10-11 的历史稿**（那时 Acts.java 还在、13 任务族未搬）。
+> 以本节为准。口径：只算 `src/main/java` 的 `.java`；上游取 `core/common` + `api/common`，本仓取 `core`。
+
+## 4.1 总进度
+
+| 维度 | 上游 | 本仓 | 覆盖 |
+|---|---|---|---|
+| core/common + api/common | 394 文件 / 50,340 行 | 377 文件 / 50,034 行 | **96%** |
+| pathing | 116 / 12,952 | 117 / 13,316 | **101%** |
+| agent 模块 | 44 / 6,662 | 62 / 8,709 | **141%**（含上游 `core/agent` 胶水归位） |
+| ai | 29 / 4,383 | 30 / 4,499 | **103%** |
+| lua | 50 / 18,938 | 50 / 18,938 | **100%** |
+| ui（整模块） | 32 / 3,891 | 0 | **0%** ⬜ |
+| plugins（整模块） | 48 / 5,689 | 0 | **0%** ⬜ |
+
+**@Fn API：66 个 / 14 组**（api/build/creative/fight/gear/gui/inv/locate/module/move/route/scan/status/task/time/use/work）；
+任务框架 `task` 87 文件 100%；53 项单测文件 / **527 用例 0 失败**；jar **961 类 = core 726 + pathing 235**。
+
+## 4.2 真实缺口（脚本按文件名比对，已排除「搬进 agent 模块」的误报）
+
+| 包 | 缺件 | 判断 |
+|---|---|---|
+| `data` | ModBlockTagData、ModItemTagData、package-info | 数据包标签层，**D 类待补** |
+| `debug` | DebugCommands、PathDebug、PathDebugRenderer | 调试命令/渲染，**D 类待补** |
+| `mc` | BrigadierHelp、McApi、Problem | McApi 为刀 1b 已知未搬；**D 类待补** |
+| `config` | ConfigMigrations | 配置迁移；**D 类待补** |
+| `entity` | NumenCommands、package-info | 上游命令表；本仓用 `command/NumenCommand` 自写顶替 → **A 类** |
+| `mixin` | 10 件（ ArchitecturyPlayerHooks / MixinEntityVehicleControl / MixinServerGamePacketListener / PlayerAdvancementsReward / ItemEntityDrops / LivingEntityTake / ServerLevelDrops / ServerPlayerGameModeDrops / ServerPlayerGameModeAccessor / package-info） | 掉落/触碰那 4 个是**本仓用 permission 层自有 mixin 替代**（C 类）；其余待逐件判 |
+| `agent`（core 包内） | request/*（RuntimeState/AgentRequestContext/BodySnapshot/MemoryPreamble/SystemPromptComposer）、skill/*（SkillInfo/SkillInjection/SkillMarkdown）、tool/ToolArgs、tool/CompanionToolPort | 本仓用 `CompanionBrain` + `NumenSystemPrompt` 自写顶替 → **A 类**；ToolArgs/CompanionToolPort 依赖 MC，逻辑留 core（已登记） |
+| 顶层 | CommonClass、NumenPaths、package-info | Fabric 入口合并进 `NumenCoreFabric`（C 类） |
+
+## 4.3 本仓独有（差异）= A/B/C 三类偏差 + 外接大脑
+
+| 类 | 位置 | 处置 |
+|---|---|---|
+| **A** 自写待对齐 | `CompanionBrain`、`NumenSystemPrompt`、`tool/ToolRunner`+`WorldTool`+`WorldTools`、`command/NumenCommand`、`config/NumenConfig`、`mc/ItemStacks`+`NbtTypes`、`mixin/SlotAccessor` | 排进归位计划 |
+| **C** 版本/偏好允许 | `client/`（G 面板自绘 7 件）、`llm/ModelCatalog`（2 件，用户要求）、`mixin/client/NumenOfflineMultiplayerMixin` | 登记即可 |
+| 新增能力 | `mcp/`（4 件，外接大脑）、`net/NumenPanelNet`+`NumenPanelServer` | 上游没有，属**新增**（D-06 外接大脑） |
+| 平台入口 | `NumenCoreFabric` | 必要 |
+
+## 4.4 已知问题（2026-10-13）
+
+1. **刀 5 @Fn 收尾未真机验收**（WIP 提交 `a9a0116`）：世界工具改走上游 `numen.*`，编译绿但真机未回归。
+2. **`scan_blocks` 语义变更**：原「扫全方块统计数量」→ `numen.scan.map`（地形俯视图）；按 id 找矿改用 Lua `numen.scan.blocks`。
+3. **21 个反编译恢复的文件无注释**（`core.build`、`core.task.build`，见提交 `32c2280`）——逻辑与刀 4 一致，可读性差，待补注释。
+4. `server-api-check.py` 报 12 处「专用服务端可能炸」，疑似把客户端包类引用误计入（输出自相矛盾），**未细查**。
+5. jar 类数基线 968 → **961**（刀 5 删 NumenTools/Acts/CompanionNav 的预期结果）。
+6. **刀 5 的 9 条改动已落 WIP**，按 D-10 R2 需在验收后 `reset --soft` 压成一个正式刀提交。

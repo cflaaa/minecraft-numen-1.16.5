@@ -33,8 +33,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <ul>
  *   <li><b>登记</b>：{@link #registerAll()} 在模组 init 时调一次——四个大脑工具
- *       （跑程序的 {@code lua}、技能、计划、札记）加本仓的世界工具（旧 {@link NumenTools}
- *       的 Spec 逐个包成 {@link WorldTool} 进同一张表，实现不动）；</li>
+ *       （跑程序的 {@code lua}、技能、计划、札记）加本仓的世界工具（{@link WorldTools} 的表
+ *       逐个包成 {@link WorldTool} 进同一张表）；</li>
  *   <li><b>派发</b>：{@link #run} 是 {@code ToolPort} 的唯一实现路径（内置大脑的循环与
  *       外接大脑的 {@code runAside} 都经它）。一次调用三选一：跑程序（ScriptTool 的口径，
  *       走本仓服务端程序链路）、大脑工具（{@link ToolRegistry#invoke}）、世界工具
@@ -43,9 +43,8 @@ import java.util.concurrent.ConcurrentHashMap;
  *       {@code tools/list} 与内置大脑的系统提示都读它，新增工具只登记一次。</li>
  * </ul>
  *
- * <p><b>世界工具为什么还走旧机制</b>：它们背后是本仓自写的 {@code Acts}（刀 4 逐族换成上游
- * 44 个 @Fn 函数），但<b>派发已经统一</b>——刀 4 到位后把这批 {@link WorldTool} 换成 @Fn 驱动的
- * 实现即可，入口、清单、MCP 面一行都不用改。
+ * <p><b>世界工具已经是 @Fn 驱动</b>（刀 5 收尾）：{@link WorldTools} 只保留名字/参数（MCP 契约）
+ * 与派发，动作本体全在上游任务族；自写的 {@code Acts} / {@code CompanionNav} / Job 机制已退役。
  */
 public final class ToolRunner {
 
