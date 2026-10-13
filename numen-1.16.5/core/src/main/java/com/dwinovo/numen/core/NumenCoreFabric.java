@@ -85,6 +85,11 @@ public final class NumenCoreFabric implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        // core 内容注册:13 任务族的 numen.* API 组(status/scan/locate/route/move/work/build/fight/use/gui/inv/gear/
+        // creative/time)+ 全部 TaskFactory 执行器 + 五条生存链。上游 NumenCoreFabric.onInitialize 的第一件事就是
+        // NumenCore.init()(ref/numen-1.20.1/core/fabric/.../NumenCoreFabric.java:21);本仓早期只挂了引擎自己的
+        // api/task/module 三组,这 13 族一直没进 runtime——真机 api.help("numen") 只列 3 组即为此,刀 4 验收第一坑。
+        NumenCore.init();
         NumenConfig.load();
 
         // 外接大脑（MCP）：读配置，开着就立刻起服。
@@ -118,8 +123,6 @@ public final class NumenCoreFabric implements ModInitializer {
                     + com.dwinovo.numen.agent.script.ScriptEngine.IN_USE.language() + " that programs use by name, kept "
                     + "as files on your owner's computer (numen/work.lua is numen.work): the built-in ones, your own, "
                     + "and how the programs that used them went.", ModuleApi.class);
-            // 原版四件甲是第一处穿戴来源，和模组的饰品栏走同一扇门（上游 core/NumenCore.init 同款位置）。
-            numen.registerGear(new com.dwinovo.numen.core.gear.VanillaArmor());
         });
 
         // 工具派道的统一入口（上游 CommonClass.registerTools 的位置与口径）：四个大脑工具
@@ -164,6 +167,12 @@ public final class NumenCoreFabric implements ModInitializer {
         ServerTickEvents.END_SERVER_TICK.register(server -> {
             Companions.tick(server);
             McpMode.instance().tick();
+            // 刀 4 的工具配套（上游 core/fabric 入口同款）：
+            // 预算分片的方块搜索每刻推进（scan.blocks / goto FIND / mine 都靠它收尾）——
+            // 不挂它，Pending 永不完成，同伴永远「手上已经有活在跑」。
+            com.dwinovo.numen.core.scan.BlockSearch.tick(server);
+            // 寻路查询：轮询走完的搜索并回执。
+            com.dwinovo.numen.core.nav.RouteQueries.serverTick(server);
         });
 
         // 服务器起来的时候把配置里的缺口说清楚——比玩家发了消息才拿到一个 401 友好得多。
@@ -172,14 +181,14 @@ public final class NumenCoreFabric implements ModInitializer {
             McpActuator.bind(server);
             String missing = NumenConfig.get().missingReason();
             if (missing == null) {
-                NumenCore.info("端点已就绪：{} / {}", NumenConfig.get().provider, NumenConfig.get().model);
+                Constants.info("端点已就绪：{} / {}", NumenConfig.get().provider, NumenConfig.get().model);
             } else {
-                NumenCore.warn("内置大脑还不能干活：{}", missing);
+                Constants.warn("内置大脑还不能干活：{}", missing);
             }
             if (McpMode.instance().enabled()) {
-                NumenCore.info("外接大脑已开启，端点 {}，令牌 {}", McpMode.instance().endpoint(),
+                Constants.info("外接大脑已开启，端点 {}，令牌 {}", McpMode.instance().endpoint(),
                         McpMode.instance().maskedToken());
-                NumenCore.info("（外脑接管期间内置大脑不干活，上面那条「端点」缺口不影响外脑）");
+                Constants.info("（外脑接管期间内置大脑不干活，上面那条「端点」缺口不影响外脑）");
             }
         });
 
@@ -227,6 +236,6 @@ public final class NumenCoreFabric implements ModInitializer {
         // 专用服务端上也会注册——装了模组的客户端连过来才有得聊。
         NumenPanelServer.register();
 
-        NumenCore.info("Numen 1.16.5 移植版已加载");
+        Constants.info("Numen 1.16.5 移植版已加载");
     }
 }

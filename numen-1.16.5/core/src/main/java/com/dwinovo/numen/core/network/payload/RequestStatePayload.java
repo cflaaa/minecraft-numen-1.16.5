@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.network.NumenNetwork;
@@ -27,7 +27,7 @@ public record RequestStatePayload(UUID uuid) implements NumenPayload {
     /** The 36 main backpack slots (hotbar + storage); equipment is already client-synced. */
     public static final int MAIN_SLOTS = 36;
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "request_state");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "request_state");
 
     @Override
     public ResourceLocation id() {

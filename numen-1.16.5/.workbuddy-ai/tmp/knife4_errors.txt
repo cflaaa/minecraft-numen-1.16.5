@@ -1,0 +1,426 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. See https://docs.gradle.org/7.6.4/userguide/gradle_daemon.html#sec:disabling_the_daemon.
+Daemon will be stopped at the end of the build 
+
+> Configure project :core
+Fabric Loom: 0.12.5
+
+> Configure project :pathing
+Fabric Loom: 0.12.5
+
+> Task :ai:compileJava UP-TO-DATE
+> Task :lua:compileJava UP-TO-DATE
+> Task :agent:compileJava UP-TO-DATE
+> Task :pathing:compileJava UP-TO-DATE
+
+> Task :core:compileJava
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\act\Interaction.java:185: 错误: 对于canBeReplaced(没有参数), 找不到合适的方法
+        boolean places = (before.canBeReplaced() && item instanceof BlockItem)
+                                ^
+    方法 BlockStateBase.canBeReplaced(BlockPlaceContext)不适用
+      (实际参数列表和形式参数列表长度不同)
+    方法 BlockStateBase.canBeReplaced(Fluid)不适用
+      (实际参数列表和形式参数列表长度不同)
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\area\Cells.java:496: 错误: 无法将类 NbtUtils中的方法 readBlockState应用到给定类型;
+                    palette[n] = new Seen(NbtUtils.readBlockState(blocks, e.getCompound("state")), e.getLong("tick"));
+                                                  ^
+  需要: CompoundTag
+  找到:    Registry,CompoundTag
+  原因: 实际参数列表和形式参数列表长度不同
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\blueprint\BlueprintStore.java:120: 错误: 找不到符号
+                    level.holderLookup(Registry.BLOCK), paletteTag.getCompound(i))));
+                                       ^
+  符号:   变量 Registry
+  位置: 类 BlueprintStore
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\blueprint\BlueprintStore.java:189: 错误: 找不到符号
+                    state.getBlock().builtInRegistryHolder().key().location().getPath()));
+                                    ^
+  符号:   方法 builtInRegistryHolder()
+  位置: 类 Block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\blueprint\BlueprintStore.java:241: 错误: 找不到符号
+                return NbtUtils.snbtToStructure(Files.readString(snbt));
+                               ^
+  符号:   方法 snbtToStructure(String)
+  位置: 类 NbtUtils
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildTaskRecord.java:261: 错误: 找不到符号
+                case "minecraft:glow_item_frame" -> net.minecraft.world.item.Items.GLOW_ITEM_FRAME;
+                                                                                  ^
+  符号:   变量 GLOW_ITEM_FRAME
+  位置: 类 Items
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildTaskRecord.java:393: 错误: 找不到符号
+            if (desiredState.hasProperty(BlockStateProperties.CANDLES)) {
+                                                             ^
+  符号:   变量 CANDLES
+  位置: 类 BlockStateProperties
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildTaskRecord.java:394: 错误: 找不到符号
+                return desiredState.getValue(BlockStateProperties.CANDLES);
+                                                                 ^
+  符号:   变量 CANDLES
+  位置: 类 BlockStateProperties
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildTaskRecord.java:398: 错误: 找不到符号
+                    || desiredState.is(net.minecraft.world.level.block.Blocks.GLOW_LICHEN)) {
+                                                                             ^
+  符号:   变量 GLOW_LICHEN
+  位置: 类 Blocks
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\ReplaceMode.java:49: 错误: 对于canBeReplaced(没有参数), 找不到合适的方法
+        boolean soft = current.isAir() || current.canBeReplaced();
+                                                 ^
+    方法 BlockStateBase.canBeReplaced(BlockPlaceContext)不适用
+      (实际参数列表和形式参数列表长度不同)
+    方法 BlockStateBase.canBeReplaced(Fluid)不适用
+      (实际参数列表和形式参数列表长度不同)
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BlueprintSafety.java:71: 错误: 找不到符号
+        if (state.is(net.minecraft.tags.BlockTags.ALL_SIGNS)) {
+                                                 ^
+  符号:   变量 ALL_SIGNS
+  位置: 类 BlockTags
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BlueprintSafety.java:101: 错误: 无法将接口 EntityBlock中的方法 newBlockEntity应用到给定类型;
+            var be = holder.newBlockEntity(net.minecraft.core.BlockPos.ZERO, state);
+                           ^
+  需要: BlockGetter
+  找到:    BlockPos,BlockState
+  原因: 实际参数列表和形式参数列表长度不同
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BuildStates.java:47: 错误: 程序包net.minecraft.core.registries.Registry不存在
+                    net.minecraft.core.registries.Registry.BLOCK.asLookup(), trimmed, false).blockState();
+                                                          ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BuildStates.java:78: 错误: 找不到符号
+        if (state.is(BlockTags.CAULDRONS)) {
+                              ^
+  符号:   变量 CAULDRONS
+  位置: 类 BlockTags
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BuildStates.java:104: 错误: 找不到符号
+        if (state.hasProperty(BlockStateProperties.BERRIES)) {
+                                                  ^
+  符号:   变量 BERRIES
+  位置: 类 BlockStateProperties
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BuildStates.java:105: 错误: 找不到符号
+            state = state.setValue(BlockStateProperties.BERRIES, false);
+                                                       ^
+  符号:   变量 BERRIES
+  位置: 类 BlockStateProperties
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BuildStates.java:204: 错误: 找不到符号
+        if (level != null && !state.hasBlockEntity()) {
+                                   ^
+  符号:   方法 hasBlockEntity()
+  位置: 类型为BlockState的变量 state
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\BuildStates.java:223: 错误: 找不到符号
+                || block instanceof net.minecraft.world.level.block.DirtPathBlock) {
+                                                                   ^
+  符号:   类 DirtPathBlock
+  位置: 程序包 net.minecraft.world.level.block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\build\Changes.java:56: 错误: 对于canBeReplaced(没有参数), 找不到合适的方法
+                boolean empty = now.isAir() || now.canBeReplaced();
+                                                  ^
+    方法 BlockStateBase.canBeReplaced(BlockPlaceContext)不适用
+      (实际参数列表和形式参数列表长度不同)
+    方法 BlockStateBase.canBeReplaced(Fluid)不适用
+      (实际参数列表和形式参数列表长度不同)
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\combat\Menace.java:176: 错误: 找不到符号
+        if (!(self.level() instanceof ServerLevel level)) {
+                  ^
+  符号:   方法 level()
+  位置: 类型为LivingEntity的变量 self
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\Terrain.java:41: 错误: 找不到符号
+        return new Terrain(new LiveWorld(player.serverLevel()), Snapshots.stats(player));
+                                               ^
+  符号:   方法 serverLevel()
+  位置: 类型为ServerPlayer的变量 player
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\DigQuote.java:43: 错误: 找不到符号
+        return new DigQuote(CompanionPorts.model(player, spec), new LiveWorld(player.serverLevel()));
+                                          ^
+  符号:   方法 model(NumenPlayer,RouteSpec)
+  位置: 类 CompanionPorts
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\DigQuote.java:116: 错误: 找不到符号
+        LiveWorld world = new LiveWorld(player.serverLevel());
+                                              ^
+  符号:   方法 serverLevel()
+  位置: 类型为ServerPlayer的变量 player
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\Feet.java:24: 错误: 找不到符号
+        LiveWorld world = new LiveWorld(body.serverLevel());
+                                            ^
+  符号:   方法 serverLevel()
+  位置: 类型为ServerPlayer的变量 body
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\Feet.java:36: 错误: 找不到符号
+        return BlockPos.containing(body.getX(), Footing.cellOf(body.getY()), body.getZ());
+                       ^
+  符号:   方法 containing(double,int,double)
+  位置: 类 BlockPos
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\Survey.java:62: 错误: 无法将类 CompanionPorts中的方法 navigator应用到给定类型;
+        return of(CompanionPorts.navigator(player, CompanionPorts.dangers(player), materials), legs);
+                                ^
+  需要: NumenPlayer,Threats
+  找到:    NumenPlayer,Threats,List<Item>
+  原因: 实际参数列表和形式参数列表长度不同
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\ThrowawayBlocks.java:83: 错误: 找不到符号
+        Inventory inventory = player.getInventory();
+                                    ^
+  符号:   方法 getInventory()
+  位置: 类型为ServerPlayer的变量 player
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\ThrowawayBlocks.java:109: 错误: 找不到符号
+        Inventory inv = player.getInventory();
+                              ^
+  符号:   方法 getInventory()
+  位置: 类型为ServerPlayer的变量 player
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\nav\Trip.java:226: 错误: 无法将类 CompanionPorts中的方法 navigator应用到给定类型;
+        return CompanionPorts.navigator(player, threats, materials);
+                             ^
+  需要: NumenPlayer,Threats
+  找到:    NumenPlayer,Threats,List<Item>
+  原因: 实际参数列表和形式参数列表长度不同
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\move\Destination.java:220: 错误: 找不到符号
+            covers.sort(Comparator.comparingDouble(c -> c.at().distToCenterSqr(her.getEyePosition(1.0F))));
+                                                              ^
+  符号:   方法 distToCenterSqr(Vec3)
+  位置: 类 BlockPos
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\scan\BlockSearch.java:172: 错误: 找不到符号
+                SectionPos.blockToSectionCoord(Math.max(center.getY() - radius, level.getMinBuildHeight())),
+                                                                                     ^
+  符号:   方法 getMinBuildHeight()
+  位置: 类型为ServerLevel的变量 level
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\scan\BlockSearch.java:337: 错误: 找不到符号
+        int index = level.getSectionIndexFromSectionY(sectionY);
+                         ^
+  符号:   方法 getSectionIndexFromSectionY(int)
+  位置: 类型为ServerLevel的变量 level
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\scan\BlockSearch.java:338: 错误: 找不到符号
+        if (index < 0 || index >= currentChunk.getSectionsCount() || !touchesSphere(sectionY)) {
+                                              ^
+  符号:   方法 getSectionsCount()
+  位置: 类型为ChunkAccess的变量 currentChunk
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\scan\BlockSearch.java:344: 错误: 找不到符号
+        LevelChunkSection section = currentChunk.getSection(index);
+                                                ^
+  符号:   方法 getSection(int)
+  位置: 类型为ChunkAccess的变量 currentChunk
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\scan\NearbyEntities.java:23: 错误: 找不到符号
+        return self.level().getEntitiesOfClass(type, self.getBoundingBox().inflate(radius),
+                   ^
+  符号:   方法 level()
+  位置: 类型为Entity的变量 self
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\scan\TargetIndex.java:348: 错误: 找不到符号
+        return section == null || section.hasOnlyAir()
+                                         ^
+  符号:   方法 hasOnlyAir()
+  位置: 类型为LevelChunkSection的变量 section
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildCompanionTask.java:74: 错误: 找不到符号
+            net.minecraft.world.level.block.Block.UPDATE_CLIENTS
+                                                 ^
+  符号:   变量 UPDATE_CLIENTS
+  位置: 类 Block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildCompanionTask.java:75: 错误: 找不到符号
+                    | net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE;
+                                                           ^
+  符号:   变量 UPDATE_KNOWN_SHAPE
+  位置: 类 Block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildCompanionTask.java:512: 错误: 找不到符号
+                    net.minecraft.world.level.block.Block.UPDATE_ALL)) {
+                                                         ^
+  符号:   变量 UPDATE_ALL
+  位置: 类 Block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildCompanionTask.java:769: 错误: 找不到符号
+            current.updateNeighbourShapes(level, pos, net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+                                                                                           ^
+  符号:   变量 UPDATE_CLIENTS
+  位置: 类 Block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildCompanionTask.java:1029: 错误: 找不到符号
+        if (r.blockEntityData.isEmpty() || !placed.hasBlockEntity()) {
+                                                  ^
+  符号:   方法 hasBlockEntity()
+  位置: 类型为BlockState的变量 placed
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildCompanionTask.java:1045: 错误: 无法将类 BlockEntity中的方法 load应用到给定类型;
+            be.load(copy);   // 1.20.1:方块实体读档不带注册表参数
+              ^
+  需要: BlockState,CompoundTag
+  找到:    CompoundTag
+  原因: 实际参数列表和形式参数列表长度不同
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildCompanionTask.java:1052: 错误: 找不到符号
+                    net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
+                                                         ^
+  符号:   变量 UPDATE_CLIENTS
+  位置: 类 Block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildFixtures.java:96: 错误: 找不到符号
+                    BlockPos anchor = BlockPos.containing(spawn.x(), spawn.y(), spawn.z());
+                                              ^
+  符号:   方法 containing(double,double,double)
+  位置: 类 BlockPos
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildFixtures.java:119: 错误: 找不到符号
+                float yaw = hangs ? entity.getYRot() : entity.rotate(spawn.rotation());
+                                          ^
+  符号:   方法 getYRot()
+  位置: 类型为Entity的变量 entity
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildFixtures.java:120: 错误: 找不到符号
+                entity.moveTo(spawn.x(), spawn.y(), spawn.z(), yaw, entity.getXRot());
+                                                                          ^
+  符号:   方法 getXRot()
+  位置: 类型为Entity的变量 entity
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildFixtures.java:175: 错误: 不兼容的类型: FlowingFluid无法转换为Tag<Fluid>
+                .filter(pos -> level.isLoaded(pos) && level.getFluidState(pos).is(Fluids.WATER))
+                                                                                        ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildFixtures.java:176: 错误: 找不到符号
+                .forEach(pos -> level.scheduleTick(pos.immutable(), Fluids.WATER,
+                                     ^
+  符号:   方法 scheduleTick(BlockPos,FlowingFluid,int)
+  位置: 类型为ServerLevel的变量 level
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildLedger.java:226: 错误: 程序包net.minecraft.core.registries.Registry不存在
+        return net.minecraft.core.registries.Registry.ITEM.getKey(item).getPath();
+                                                     ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\build\BuildOrder.java:80: 错误: 找不到符号
+                || b instanceof net.minecraft.world.level.block.CarpetBlock
+                                                               ^
+  符号:   类 CarpetBlock
+  位置: 程序包 net.minecraft.world.level.block
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\chain\BreathChain.java:137: 错误: 找不到符号
+        BlockPos p = BlockPos.containing(companion.getEyePosition(1.0F));
+                             ^
+  符号:   方法 containing(Vec3)
+  位置: 类 BlockPos
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\chain\BreathChain.java:168: 错误: 找不到符号
+        BlockPos start = BlockPos.containing(companion.getEyePosition(1.0F));
+                                 ^
+  符号:   方法 containing(Vec3)
+  位置: 类 BlockPos
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\chain\FleeChain.java:109: 错误: 程序包Constants不存在
+            Constants.LOG.info("[numen-flee] 扛不住了,跑 —— 身边 {} 只在追",
+                     ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\chain\FleeChain.java:156: 错误: 程序包Constants不存在
+        Constants.LOG.info("[numen-flee] 退不掉,就地还手");
+                 ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\chain\MobDefenseChain.java:131: 错误: 程序包Constants不存在
+        Constants.LOG.info("[numen-defense] 自动接管 —— 身边 {} 个危险",
+                 ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\chain\MobDefenseChain.java:143: 错误: 程序包Constants不存在
+        Constants.LOG.info("[numen-defense] 收场 {} —— {}", state, line);
+                 ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:342: 错误: 找不到符号
+        return e == null || e.isRemoved() || e == player ? null : e;
+                             ^
+  符号:   方法 isRemoved()
+  位置: 类型为Entity的变量 e
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:352: 错误: 找不到符号
+            if (e == null || e.isRemoved()) {
+                              ^
+  符号:   方法 isRemoved()
+  位置: 类型为Entity的变量 e
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:612: 错误: 找不到符号
+        BlockPos toward = target != null && !target.isRemoved() ? target.blockPosition() : player.blockPosition();
+                                                   ^
+  符号:   方法 isRemoved()
+  位置: 类型为Entity的变量 target
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:697: 错误: 找不到符号
+        return target == null || target.isRemoved()
+                                       ^
+  符号:   方法 isRemoved()
+  位置: 类型为Entity的变量 target
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:729: 错误: 找不到符号
+        boolean haveTarget = target != null && !target.isRemoved();
+                                                      ^
+  符号:   方法 isRemoved()
+  位置: 类型为Entity的变量 target
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:749: 错误: 找不到符号
+                ? Goals.within(Goals.column(target.getBlockX(), target.getBlockZ()), skirmishInner(), skirmishOuter())
+                                                  ^
+  符号:   方法 getBlockX()
+  位置: 类型为Entity的变量 target
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:749: 错误: 找不到符号
+                ? Goals.within(Goals.column(target.getBlockX(), target.getBlockZ()), skirmishInner(), skirmishOuter())
+                                                                      ^
+  符号:   方法 getBlockZ()
+  位置: 类型为Entity的变量 target
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\combat\AttackCompanionTask.java:774: 错误: 找不到符号
+        String line = target == null || target.isRemoved()
+                                              ^
+  符号:   方法 isRemoved()
+  位置: 类型为Entity的变量 target
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\dig\DigCompanionTask.java:277: 错误: 找不到符号
+        BlockPos eye = BlockPos.containing(player.getEyePosition(1.0F));
+                               ^
+  符号:   方法 containing(Vec3)
+  位置: 类 BlockPos
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\fish\FishCompanionTask.java:179: 错误: 找不到符号
+        if (hook == null || hook.isRemoved()) {
+                                ^
+  符号:   方法 isRemoved()
+  位置: 类型为FishingHook的变量 hook
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\fish\FishCompanionTask.java:195: 错误: 找不到符号
+            for (net.minecraft.world.entity.item.ItemEntity item : hook.level().getEntitiesOfClass(
+                                                                       ^
+  符号:   方法 level()
+  位置: 类型为FishingHook的变量 hook
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\fish\FishCompanionTask.java:198: 错误: 程序包net.minecraft.core.registries.Registry不存在
+                caught.add(net.minecraft.core.registries.Registry.ITEM.getKey(item.getItem().getItem())
+                                                                 ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\fish\FishCompanionTask.java:206: 错误: 找不到符号
+        boolean inWater = hook.level().getFluidState(hook.blockPosition()).is(FluidTags.WATER);
+                              ^
+  符号:   方法 level()
+  位置: 类型为FishingHook的变量 hook
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\fish\FishCompanionTask.java:209: 错误: 找不到符号
+                    hook.blockPosition().toShortString(), hook.onGround(), phaseTicks);
+                                                              ^
+  符号:   方法 onGround()
+  位置: 类型为FishingHook的变量 hook
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\fish\FishCompanionTask.java:409: 错误: 找不到符号
+            hook.discard();
+                ^
+  符号:   方法 discard()
+  位置: 类型为FishingHook的变量 hook
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\tools\ContainerOps.java:74: 错误: 找不到符号
+        return state.hasBlockEntity() ? Action.take(block, state, taken.getItem()) : null;
+                    ^
+  符号:   方法 hasBlockEntity()
+  位置: 类型为BlockState的变量 state
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\move\FollowCompanionTask.java:201: 错误: 找不到符号
+            return owner == null || owner.level() != companion.level() ? null : owner;
+                                         ^
+  符号:   方法 level()
+  位置: 类型为ServerPlayer的变量 owner
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\task\move\FollowCompanionTask.java:204: 错误: 找不到符号
+        return e == null || e.isRemoved() ? null : e;
+                             ^
+  符号:   方法 isRemoved()
+  位置: 类型为Entity的变量 e
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\tools\perception\ScanApi.java:277: 错误: 找不到符号
+        return new BlockInfo(BlockAt.of(pos, state), properties, state.isAir(), state.isSolid(),
+                                                                                     ^
+  符号:   方法 isSolid()
+  位置: 类型为BlockState的变量 state
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\tools\perception\StatusApi.java:169: 错误: 找不到符号
+        boolean sameDimension = self.level().dimension().equals(player.level().dimension());
+                                                                      ^
+  符号:   方法 level()
+  位置: 类型为Player的变量 player
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\tools\perception\StatusApi.java:173: 错误: 找不到符号
+                Optional.of(sameDimension), Optional.of(player.level().dimension().location().toString()),
+                                                              ^
+  符号:   方法 level()
+  位置: 类型为Player的变量 player
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\tools\RecipeBook.java:58: 错误: 程序包net.minecraft.item.crafting不存在
+                } else if (r instanceof net.minecraft.item.crafting.IRecipe sm) {
+                                                                   ^
+C:\Users\cfl\workbuddy-ai\我的世界\numen-1.16.5\core\src\main\java\com\dwinovo\numen\core\tools\RecipeProbe.java:24: 错误: 无法将接口 Recipe<C>中的方法 getResultItem应用到给定类型;
+        return probe(() -> recipe.getResultItem(registries));
+                                 ^
+  需要: 没有参数
+  找到:    RegistryAccess
+  原因: 实际参数列表和形式参数列表长度不同
+  其中, C是类型变量:
+    C扩展已在接口 Recipe中声明的Container
+注: 某些消息已经过简化; 请使用 -Xdiags:verbose 重新编译以获得完整输出
+79 个错误
+
+> Task :core:compileJava FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':core:compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+
+* Get more help at https://help.gradle.org
+
+BUILD FAILED in 23s
+5 actionable tasks: 1 executed, 4 up-to-date

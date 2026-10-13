@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.client;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.net.NumenPanelNet;
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
@@ -58,14 +58,14 @@ public final class NumenClientFabric implements ClientModInitializer {
                     try {
                         json = buf.readUtf(32767);
                     } catch (RuntimeException ex) {
-                        NumenCore.warn("[numen-panel] 收包读不出来：{}", ex.toString());
+                        Constants.warn("[numen-panel] 收包读不出来：{}", ex.toString());
                         return;
                     }
                     client.execute(() -> NumenPanelState.accept(json));
                 });
 
         ClientTickEvents.END_CLIENT_TICK.register(NumenClientFabric::tick);
-        NumenCore.info("[numen-panel] 客户端已就绪：按 G 打开面板（可在「选项 → 控制」里改键）");
+        Constants.info("[numen-panel] 客户端已就绪：按 G 打开面板（可在「选项 → 控制」里改键）");
     }
 
     /**
@@ -97,7 +97,7 @@ public final class NumenClientFabric implements ClientModInitializer {
                 && mc.screen instanceof net.minecraft.client.gui.screens.TitleScreen) {
             debugOpened = true;
             mc.setScreen(new NumenPanelScreen().debugTab(DEBUG_PANEL));
-            NumenCore.info("[numen-panel] 排查开关生效：自动打开面板的 {} 页", DEBUG_PANEL);
+            Constants.info("[numen-panel] 排查开关生效：自动打开面板的 {} 页", DEBUG_PANEL);
         }
     }
 }

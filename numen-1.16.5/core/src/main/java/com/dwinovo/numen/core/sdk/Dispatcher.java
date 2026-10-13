@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.sdk;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.agent.script.ApiError;
 import com.dwinovo.numen.agent.script.ApiReply;
 import com.dwinovo.numen.agent.script.ErrorKind;
@@ -183,7 +183,7 @@ public final class Dispatcher {
                     Call.help(fn.fullName()), null).toString());
             return;
         } catch (RuntimeException broke) {
-            NumenCore.LOG.error("[numen-api] {} broke", fn.fullName(), broke);
+            Constants.LOG.error("[numen-api] {} broke", fn.fullName(), broke);
             reply.accept(ApiReply.error(ErrorKind.FAILED, fn.fullName() + " broke: " + broke, null, null).toString());
             return;
         }

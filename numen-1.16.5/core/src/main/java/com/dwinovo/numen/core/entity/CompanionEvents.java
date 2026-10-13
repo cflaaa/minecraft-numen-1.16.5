@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.entity;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.api.CompanionEvent;
 
 import java.util.List;
@@ -44,7 +44,7 @@ public final class CompanionEvents {
             try {
                 ((Consumer<T>) h).accept(payload);
             } catch (RuntimeException e) {
-                NumenCore.LOG.error("[numen] 插件处理 {} 事件时出错", event, e);
+                Constants.LOG.error("[numen] 插件处理 {} 事件时出错", event, e);
             }
         }
     }

@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
 import net.minecraft.network.FriendlyByteBuf;
@@ -30,7 +30,7 @@ import java.util.function.Predicate;
 public record NumenDeathPayload(UUID entityUuid, String cause)
         implements NumenPayload, Wire.Oversized<NumenDeathPayload> {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "numen_death");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "numen_death");
 
     @Override
     public ResourceLocation id() {

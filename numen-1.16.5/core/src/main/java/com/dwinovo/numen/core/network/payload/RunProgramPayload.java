@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.network.NumenNetwork;
@@ -40,7 +40,7 @@ import java.util.UUID;
 public record RunProgramPayload(UUID entityUuid, String programId, String code, ModuleSet modules)
         implements NumenPayload, Wire.Fragmentable {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "run_program");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "run_program");
 
     @Override
     public ResourceLocation id() {
@@ -73,11 +73,11 @@ public record RunProgramPayload(UUID entityUuid, String programId, String code, 
 
     /** Handler invoked on the server main thread. */
     public static void handle(RunProgramPayload p, ServerPlayer player) {
-        NumenCore.LOG.debug("[numen-net] ← run_program from {} entity={} id={} code_chars={} bodies={}",
+        Constants.LOG.debug("[numen-net] ← run_program from {} entity={} id={} code_chars={} bodies={}",
                 player.getName().getString(), p.entityUuid(), p.programId(), p.code().length(),
                 p.modules().bodies().size());
         NumenPlayer companion = OwnedBody.of(player, p.entityUuid(), message -> {
-            NumenCore.LOG.warn("[numen-net] ✗ run_program rejected from {}: id={} reason={}",
+            Constants.LOG.warn("[numen-net] ✗ run_program rejected from {}: id={} reason={}",
                     player.getName().getString(), p.programId(), message);
             reply(player, p, RunResult.refused(message));
         });

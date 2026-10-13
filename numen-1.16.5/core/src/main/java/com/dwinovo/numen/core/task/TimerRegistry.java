@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.task;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.entity.CompanionRegistry;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.event.NumenEvents;
@@ -192,7 +192,7 @@ public final class TimerRegistry extends SavedData {
         if (!spent.isEmpty()) {
             spent.forEach(timers::remove);
             setDirty();
-            NumenCore.LOG.info("[numen-task] {} 个表到点", spent.size());
+            Constants.LOG.info("[numen-task] {} 个表到点", spent.size());
         }
     }
 

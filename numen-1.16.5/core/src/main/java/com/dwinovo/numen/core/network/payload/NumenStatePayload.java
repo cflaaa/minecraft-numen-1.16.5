@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
 import net.minecraft.nbt.CompoundTag;
@@ -47,7 +47,7 @@ public record NumenStatePayload(UUID uuid, boolean loaded, List<ItemStack> items
                                 String vehicleType, int vehicleId, String bodyState)
         implements NumenPayload, Wire.Oversized<NumenStatePayload> {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "numen_state");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "numen_state");
 
     /** 物品清单的护栏:36 主格 + 2×2 合成栏,64 远超实际上限,防的是恶意长度。 */
     private static final int MAX_ITEMS = 64;

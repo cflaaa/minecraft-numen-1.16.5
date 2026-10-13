@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.mcp;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 
 import java.nio.file.Path;
 
@@ -71,7 +71,7 @@ public final class McpMode {
             startServer();
         } else {
             this.enabled = false;
-            NumenCore.info("[numen-mcp] 外接大脑模式关闭（{} 里 enabled=false）", file);
+            Constants.info("[numen-mcp] 外接大脑模式关闭（{} 里 enabled=false）", file);
         }
     }
 
@@ -110,13 +110,13 @@ public final class McpMode {
             s.start();
         } catch (Exception ex) {
             lastError = ex.getMessage() == null ? ex.toString() : ex.getMessage();
-            NumenCore.error("[numen-mcp] 起服失败 {}:{} —— {}", config.host(), config.port(), ex.toString());
+            Constants.error("[numen-mcp] 起服失败 {}:{} —— {}", config.host(), config.port(), ex.toString());
             enabled = false;
             return false;
         }
         server = s;
         enabled = true;
-        NumenCore.info("[numen-mcp] 外接大脑模式已开启，端点 {}（令牌见配置文件；改动 host/port 要重进世界）", endpoint());
+        Constants.info("[numen-mcp] 外接大脑模式已开启，端点 {}（令牌见配置文件；改动 host/port 要重进世界）", endpoint());
         return true;
     }
 
@@ -127,7 +127,7 @@ public final class McpMode {
         }
         enabled = false;
         clientName = null;
-        NumenCore.info("[numen-mcp] 外接大脑模式已关闭，内置大脑恢复接管");
+        Constants.info("[numen-mcp] 外接大脑模式已关闭，内置大脑恢复接管");
     }
 
     /** 服务器要关了：把 HTTP 服务器一起收掉，别留着线程。 */
@@ -171,11 +171,11 @@ public final class McpMode {
         boolean quiet = System.currentTimeMillis() - lastActivityMs > QUIET_AFTER_MS;
         if (quiet && !announcedQuiet) {
             announcedQuiet = true;
-            NumenCore.warn("[numen-mcp] 外接大脑安静超过 {} 秒{}", QUIET_AFTER_MS / 1000,
+            Constants.warn("[numen-mcp] 外接大脑安静超过 {} 秒{}", QUIET_AFTER_MS / 1000,
                     config.quietFallback() ? "，内置大脑临时接管" : "，她安静待命（未开失联接管）");
         } else if (!quiet && announcedQuiet) {
             announcedQuiet = false;
-            NumenCore.info("[numen-mcp] 外接大脑回来了，驾驶席交还");
+            Constants.info("[numen-mcp] 外接大脑回来了，驾驶席交还");
         }
     }
 

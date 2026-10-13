@@ -1,7 +1,7 @@
 package com.dwinovo.numen.core.config;
 
 import com.dwinovo.numen.agent.llm.LlmEndpoint;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonSyntaxException;
@@ -76,12 +76,12 @@ public final class NumenConfig {
                 if (parsed != null) {
                     instance = parsed;
                     instance.clamp();
-                    NumenCore.info("配置已从 {} 读取", file);
+                    Constants.info("配置已从 {} 读取", file);
                     return;
                 }
             } catch (IOException | JsonSyntaxException ex) {
                 // 配置坏了不该拦住启动：留一份现场，用默认值继续跑。
-                NumenCore.warn("配置 {} 读不出来（{}），改用默认值", file, ex.toString());
+                Constants.warn("配置 {} 读不出来（{}），改用默认值", file, ex.toString());
             }
         }
         instance = new NumenConfig();
@@ -100,7 +100,7 @@ public final class NumenConfig {
                 GSON.toJson(instance, writer);
             }
         } catch (IOException ex) {
-            NumenCore.error("配置写不出去 {}：{}", target, ex.toString());
+            Constants.error("配置写不出去 {}：{}", target, ex.toString());
         }
     }
 

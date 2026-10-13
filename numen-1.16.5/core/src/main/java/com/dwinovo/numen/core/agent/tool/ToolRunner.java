@@ -12,7 +12,7 @@ import com.dwinovo.numen.agent.tool.SkillTool;
 import com.dwinovo.numen.agent.tool.TodoTool;
 import com.dwinovo.numen.agent.tool.ToolCall;
 import com.dwinovo.numen.agent.tool.ToolRegistry;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.CompanionBrain;
 import com.dwinovo.numen.core.agent.NumenTools;
 import com.dwinovo.numen.core.entity.Companions;
@@ -91,7 +91,7 @@ public final class ToolRunner {
         for (IToolSpec spec : NumenTools.specs()) {
             ToolRegistry.register(new WorldTool(spec));
         }
-        NumenCore.info("登记 {} 个工具：{} 个大脑工具 + {} 个世界工具",
+        Constants.info("登记 {} 个工具：{} 个大脑工具 + {} 个世界工具",
                 ToolRegistry.size(), brains, ToolRegistry.size() - brains);
     }
 
@@ -145,7 +145,7 @@ public final class ToolRunner {
             } catch (IllegalArgumentException invalid) {
                 sink.finished(call, ToolOutcome.failure("invalid arguments: " + invalid.getMessage()));
             } catch (RuntimeException ex) {
-                NumenCore.error("工具 {} 抛了异常（id={}）", name, call.id(), ex);
+                Constants.error("工具 {} 抛了异常（id={}）", name, call.id(), ex);
                 sink.finished(call, ToolOutcome.failure(ex.getMessage()));
             }
         }

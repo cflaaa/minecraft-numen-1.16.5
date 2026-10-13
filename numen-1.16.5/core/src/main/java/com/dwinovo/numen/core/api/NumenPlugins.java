@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.api;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.agent.inbox.EventTypes;
 import com.dwinovo.numen.core.api.gear.GearSlot;
 import com.dwinovo.numen.core.api.gear.GearSource;
@@ -193,12 +193,12 @@ public final class NumenPlugins {
             try {
                 String x = f.apply(subject);
                 if (FAILING.remove(f)) {
-                    NumenCore.LOG.info("[numen] 插件的运行期状态又算得出来了");
+                    Constants.LOG.info("[numen] 插件的运行期状态又算得出来了");
                 }
                 if (x != null && !x.isBlank()) sb.append(x);
             } catch (RuntimeException e) {
                 if (FAILING.add(f)) {
-                    NumenCore.LOG.error("[numen] 插件的运行期状态算不出来,这一段跳过(接着出错不再重复记)", e);
+                    Constants.LOG.error("[numen] 插件的运行期状态算不出来,这一段跳过(接着出错不再重复记)", e);
                 }
             }
         }
@@ -212,7 +212,7 @@ public final class NumenPlugins {
         try {
             r.run();
         } catch (RuntimeException e) {
-            NumenCore.LOG.error("[numen] 插件的客户端初始化出错", e);
+            Constants.LOG.error("[numen] 插件的客户端初始化出错", e);
         }
     }
 

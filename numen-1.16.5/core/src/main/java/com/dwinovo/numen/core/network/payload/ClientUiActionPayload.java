@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.resources.ResourceLocation;
@@ -17,7 +17,7 @@ public record ClientUiActionPayload(Action action) implements NumenPayload {
 
     public enum Action { OPEN_SETTINGS, RESET_LOOPS, DEBUG_TEXT_ON, DEBUG_TEXT_OFF }
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "client_ui_action");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "client_ui_action");
 
     @Override
     public ResourceLocation id() {

@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.client;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 
@@ -72,9 +72,9 @@ public final class NumenOfflineMultiplayer {
         if (!logged) {
             logged = true;
             String who = describeUser();
-            NumenCore.info("离线会话：{}原本被禁用，已放行（账户 {}）",
+            Constants.info("离线会话：{}原本被禁用，已放行（账户 {}）",
                     what, who == null ? "未知" : who);
-            NumenCore.info("要关掉这个行为，加 JVM 参数 -D{}=false", PROPERTY);
+            Constants.info("要关掉这个行为，加 JVM 参数 -D{}=false", PROPERTY);
         }
         return true;
     }

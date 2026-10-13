@@ -3,7 +3,7 @@ package com.dwinovo.numen.core.llm;
 import com.dwinovo.numen.agent.http.HttpLlmTransport;
 import com.dwinovo.numen.agent.provider.LlmProvider;
 import com.dwinovo.numen.agent.provider.ProviderRegistry;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.config.NumenConfig;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -62,7 +62,7 @@ public final class ModelCatalog {
         }
         if (apiKey == null || apiKey.isBlank()) {
             // 有些本地服务（Ollama / LM Studio）不校验密钥，所以这里只是提醒，不阻止。
-            NumenCore.info("[numen-models] 没有密钥，直接试一次（本地服务通常不需要）");
+            Constants.info("[numen-models] 没有密钥，直接试一次（本地服务通常不需要）");
         }
 
         LlmProvider provider = providerFor(providerId);
@@ -70,7 +70,7 @@ public final class ModelCatalog {
         Map<String, String> headers = ProviderRegistry.headers(providerId);
         Map<String, String> auth = provider.authHeaders(apiKey);
 
-        NumenCore.info("[numen-models] 拉取模型列表：{}", url);
+        Constants.info("[numen-models] 拉取模型列表：{}", url);
 
         // 传输层与聊天用的是同一套（同一个代理/报头口径），
         // 所以「能聊天但拉不到模型」基本不会出现。
@@ -87,7 +87,7 @@ public final class ModelCatalog {
                 done.accept(ids, "服务商回了内容，但里面一个模型都没有（响应可能不是 OpenAI 格式）");
                 return;
             }
-            NumenCore.info("[numen-models] 拿到 {} 个模型", ids.size());
+            Constants.info("[numen-models] 拿到 {} 个模型", ids.size());
             done.accept(ids, null);
         }));
     }
@@ -152,7 +152,7 @@ public final class ModelCatalog {
         } catch (RuntimeException | Error ex) {
             // 拿不到具体方言也不该让整件事失败：缺省按 OpenAI 兼容处理，
             // 它覆盖绝大多数站点，而且我们只是要个 chatPath() 用来剥路径。
-            NumenCore.warn("[numen-models] 认不出服务商 {}（{}），按 OpenAI 兼容处理",
+            Constants.warn("[numen-models] 认不出服务商 {}（{}），按 OpenAI 兼容处理",
                     providerId, ex.toString());
             return null;
         }

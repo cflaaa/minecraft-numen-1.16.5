@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
 import net.minecraft.network.FriendlyByteBuf;
@@ -43,7 +43,7 @@ public record CompanionListPayload(String worldId, List<Entry> companions) imple
         }
     }
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "companion_list");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "companion_list");
 
     @Override
     public ResourceLocation id() {

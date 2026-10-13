@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.command;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.CompanionBrain;
 import com.dwinovo.numen.core.config.NumenConfig;
 import com.dwinovo.numen.core.data.ModLanguageData;
@@ -435,7 +435,7 @@ public final class NumenCommand {
         boolean secret = key.equals("apiKey");
         String shown = secret ? "（已设置，" + value.length() + " 个字符）" : value;
         ctx.getSource().sendSuccess(new TextComponent("已设置 " + key + " = " + shown), false);
-        NumenCore.info("配置 {} 已更新", key);
+        Constants.info("配置 {} 已更新", key);
         return 1;
     }
 

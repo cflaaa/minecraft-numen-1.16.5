@@ -2,7 +2,7 @@ package com.dwinovo.numen.core.network.payload;
 
 import com.dwinovo.numen.agent.json.JsonCompat;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.agent.inbox.EventQueue;
 import com.dwinovo.numen.core.event.NumenEvents;
@@ -44,7 +44,7 @@ import java.util.function.Predicate;
 public record NumenEventPayload(UUID entityUuid, List<EventQueue.Entry> entries)
         implements NumenPayload, Wire.Oversized<NumenEventPayload> {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "numen_event");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "numen_event");
 
     @Override
     public ResourceLocation id() {

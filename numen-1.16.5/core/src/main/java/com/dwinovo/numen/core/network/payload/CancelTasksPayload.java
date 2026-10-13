@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import net.minecraft.network.FriendlyByteBuf;
@@ -26,7 +26,7 @@ import java.util.UUID;
  */
 public record CancelTasksPayload(UUID entityUuid) implements NumenPayload {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "cancel_tasks");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "cancel_tasks");
 
     @Override
     public ResourceLocation id() {
@@ -48,16 +48,16 @@ public record CancelTasksPayload(UUID entityUuid) implements NumenPayload {
         // that has wandered into another dimension or out of view distance.
         NumenPlayer numen = NumenPlayer.findByUuid(player.level.getServer(), p.entityUuid());
         if (numen == null) {
-            NumenCore.LOG.debug("[numen-net] cancel_tasks for unknown entity {}", p.entityUuid());
+            Constants.LOG.debug("[numen-net] cancel_tasks for unknown entity {}", p.entityUuid());
             return;
         }
         if (!numen.isOwnedByPlayer(player.getUUID())) {
-            NumenCore.LOG.warn("[numen-net] ✗ cancel_tasks rejected from {}: not the owner",
+            Constants.LOG.warn("[numen-net] ✗ cancel_tasks rejected from {}: not the owner",
                     player.getName().getString());
             return;
         }
         com.dwinovo.numen.core.task.CompanionTickDispatcher.cancelFor(numen);
-        NumenCore.LOG.info("[numen-net] ✓ cancel_tasks on entity {} for {}",
+        Constants.LOG.info("[numen-net] ✓ cancel_tasks on entity {} for {}",
                 p.entityUuid(), player.getName().getString());
     }
 }

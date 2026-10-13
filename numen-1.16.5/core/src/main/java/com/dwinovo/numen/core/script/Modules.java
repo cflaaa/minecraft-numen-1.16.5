@@ -2,7 +2,7 @@ package com.dwinovo.numen.core.script;
 
 import com.dwinovo.numen.agent.json.JsonCompat;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.agent.script.ScriptCatalog;
 import com.dwinovo.numen.agent.script.ScriptEngine;
 import com.google.gson.Gson;
@@ -512,7 +512,7 @@ public final class Modules implements ScriptCatalog.ModuleSource {
             JsonElement parsed = JsonCompat.parse(text);
             return parsed.isJsonObject() ? parsed.getAsJsonObject() : new JsonObject();
         } catch (RuntimeException unreadable) {
-            NumenCore.LOG.warn("[numen-script] 模块账本读不通,当作空的: {}", dir.resolve(LEDGER));
+            Constants.LOG.warn("[numen-script] 模块账本读不通,当作空的: {}", dir.resolve(LEDGER));
             return new JsonObject();
         }
     }

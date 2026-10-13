@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
 import com.dwinovo.numen.core.entity.NumenPlayer;
@@ -30,7 +30,7 @@ public record LocateNumenPayload(List<UUID> entityUuids) implements NumenPayload
     /** Roster panels are small; cap defends against garbage input. */
     public static final int MAX_UUIDS = 16;
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "locate_numen");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "locate_numen");
 
     @Override
     public ResourceLocation id() {

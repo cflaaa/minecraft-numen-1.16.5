@@ -17,7 +17,7 @@ import com.dwinovo.numen.agent.loop.ModelRequest;
 import com.dwinovo.numen.agent.loop.ToolPort;
 import com.dwinovo.numen.agent.provider.AssistantTurn;
 import com.dwinovo.numen.agent.provider.LlmToolCall;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.config.NumenConfig;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.mcp.McpMode;
@@ -207,7 +207,7 @@ public final class CompanionBrain {
     }
 
     private void onLoopEvent(LoopEvent event) {
-        NumenCore.info("同伴 {} 事件：{}", name(), event);
+        Constants.info("同伴 {} 事件：{}", name(), event);
     }
 
     // =====================================================================

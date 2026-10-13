@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.client;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.net.NumenPanelNet;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -152,7 +152,7 @@ public final class NumenPanelScreen extends Screen {
             reportedLayout = true;
             // 报一次就够了。验证脚本靠这行确认「这一页真的被画过」；
             // 被 fits() 拦下来的块另有「放不下」的日志。
-            NumenCore.info("[numen-panel] {} 页已绘制：窗口 {}x{}，面板 {}x{}，正文区 y={}→{}",
+            Constants.info("[numen-panel] {} 页已绘制：窗口 {}x{}，面板 {}x{}，正文区 y={}→{}",
                     tab.name().toLowerCase(), this.width, this.height, pw, ph,
                     py + HEADER_H, py + ph - STATUS_H);
         }
@@ -568,7 +568,7 @@ public final class NumenPanelScreen extends Screen {
         if (y + h <= bottom) {
             return true;
         }
-        NumenCore.info("[numen-panel] 放不下，未绘制：{}（需要到 {}，正文区只到 {}）", what, y + h, bottom);
+        Constants.info("[numen-panel] 放不下，未绘制：{}（需要到 {}，正文区只到 {}）", what, y + h, bottom);
         return false;
     }
 

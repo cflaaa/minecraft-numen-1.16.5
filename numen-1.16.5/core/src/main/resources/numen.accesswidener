@@ -3,3 +3,17 @@ accessWidener	v1	named
 # NumenPlayer.showAllSkinLayers() 要点亮皮肤覆盖层。
 # 1.20.1 上这个字段已经是 protected，上游不需要额外声明；1.16.5 上它是 Player 的私有字段。
 accessible	field	net/minecraft/world/entity/player/Player	DATA_PLAYER_MODE_CUSTOMISATION	Lnet/minecraft/network/syncher/EntityDataAccessor;
+
+# locate structure（按刻分片的 /locate structure）：上游 1.20.1 靠
+# StructurePlacement + StructureManager.checkStructurePresence 这两样公开件；
+# 1.16.5 两样都没有，同一趟判据改叫 StructureFeature#isFeatureChunk 且是 protected。
+# 开出来，才能做到"答案与真实生成一致、又一块区块都不加载"。
+accessible	method	net/minecraft/world/level/levelgen/feature/StructureFeature	isFeatureChunk	(Lnet/minecraft/world/level/chunk/ChunkGenerator;Lnet/minecraft/world/level/biome/BiomeSource;JLnet/minecraft/world/level/levelgen/WorldgenRandom;IILnet/minecraft/world/level/biome/Biome;Lnet/minecraft/world/level/ChunkPos;Lnet/minecraft/world/level/levelgen/feature/configurations/FeatureConfiguration;)Z
+
+# 据点（stronghold）在 1.16.5 不走随机撒点表，按同心环布点，环上坐标由 ChunkGenerator
+# 自己算好存着（原版 /locate stronghold 走的就是这一支）。上游对应
+# ConcentricRingsStructurePlacement.getRingPositionsFor()。两者都是 private/final，
+# 开出来直接取环上最近的一个——与上游那个分支同一个意思，也一块区块都不加载。
+accessible	method	net/minecraft/world/level/chunk/ChunkGenerator	generateStrongholds	()V
+accessible	field	net/minecraft/world/level/chunk/ChunkGenerator	strongholdPositions	Ljava/util/List;
+

@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.permission.Action;
 import com.dwinovo.numen.core.permission.ConsentDesk;
@@ -55,7 +55,7 @@ public record ConsentRequestPayload(UUID companion, long requestId, List<Consent
     public static final int MAX_OUTLINED_BLOCKS = 256;
     public static final int MAX_OUTLINED_ENTITIES = 32;
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "consent_request");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "consent_request");
 
     public static ConsentRequestPayload of(ConsentRequest request) {
         List<Long> blocks = new ArrayList<>();

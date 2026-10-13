@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.entity.Companions;
 import com.dwinovo.numen.core.network.Wire;
@@ -24,7 +24,7 @@ public record SummonRequestPayload(String name, String skinValue, String skinSig
 
     public static final int MAX_NAME = 16;
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "summon_request");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "summon_request");
 
     @Override
     public ResourceLocation id() {

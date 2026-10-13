@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.Fragments;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
@@ -23,8 +23,8 @@ import java.util.function.Function;
 public record FragmentPayload(ResourceLocation id, int message, int index, int count,
                               Optional<ResourceLocation> inner, byte[] chunk) implements NumenPayload {
 
-    public static final ResourceLocation TO_SERVER_ID = new ResourceLocation(NumenCore.MOD_ID, "fragment_to_server");
-    public static final ResourceLocation TO_CLIENT_ID = new ResourceLocation(NumenCore.MOD_ID, "fragment_to_client");
+    public static final ResourceLocation TO_SERVER_ID = new ResourceLocation(Constants.MOD_ID, "fragment_to_server");
+    public static final ResourceLocation TO_CLIENT_ID = new ResourceLocation(Constants.MOD_ID, "fragment_to_client");
 
     /** 这个方向上的片的通道 id。 */
     public static ResourceLocation idOf(Wire direction) {

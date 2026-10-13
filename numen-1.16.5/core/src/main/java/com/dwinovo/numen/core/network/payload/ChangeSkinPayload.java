@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.entity.CompanionRegistry;
 import com.dwinovo.numen.core.entity.Companions;
@@ -27,7 +27,7 @@ import java.util.UUID;
 public record ChangeSkinPayload(UUID uuid, String skinValue, String skinSig)
         implements NumenPayload {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "change_skin");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "change_skin");
 
     @Override
     public ResourceLocation id() {

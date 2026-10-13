@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.program;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.agent.inbox.EventQueue;
 import com.dwinovo.numen.agent.script.Program;
 import com.dwinovo.numen.agent.script.ScriptCall;
@@ -144,7 +144,7 @@ public final class ServerPrograms {
         ProgramCalls calls = new ObservedCalls(new RoutedCalls(
                 new ServerCalls(her, running.lane, job -> running.claimed = request.reportsToModel() ? job : null),
                 client), observer);
-        NumenCore.LOG.info("[numen-program] {} runs {} on the server: {}", companion, request.programId(),
+        Constants.LOG.info("[numen-program] {} runs {} on the server: {}", companion, request.programId(),
                 request.code());
         running.program = new Program(request.programId(), request.code(),
                 new ProgramPort(her, opened.modules(), calls), new SerialExecutor(THREADS), outcome -> {

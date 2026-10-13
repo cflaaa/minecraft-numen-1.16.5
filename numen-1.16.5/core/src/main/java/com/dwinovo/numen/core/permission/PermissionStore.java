@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.permission;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -94,7 +94,7 @@ public final class PermissionStore extends SavedData {
      */
     static PermissionStore decode(CompoundTag tag) {
         return CODEC.parse(NbtOps.INSTANCE, tag)
-                .resultOrPartial(error -> NumenCore.LOG.error("[numen-permission] 权限存档有读不懂的内容: {}", error))
+                .resultOrPartial(error -> Constants.LOG.error("[numen-permission] 权限存档有读不懂的内容: {}", error))
                 .orElse(null);
     }
 
@@ -102,7 +102,7 @@ public final class PermissionStore extends SavedData {
         List<Rule> table = new ArrayList<>();
         for (String row : rows) {
             Rule.CODEC.parse(NbtOps.INSTANCE, StringTag.valueOf(row))
-                    .resultOrPartial(error -> NumenCore.LOG.error("[numen-permission] 权限存档有读不懂的内容: {}", error))
+                    .resultOrPartial(error -> Constants.LOG.error("[numen-permission] 权限存档有读不懂的内容: {}", error))
                     .ifPresent(table::add);
         }
         return table;

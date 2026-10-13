@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.network.OwnedBody;
@@ -28,7 +28,7 @@ import java.util.UUID;
 public record StopProgramPayload(UUID entityUuid, String programId, boolean cutOff, boolean stopBody, String why)
         implements NumenPayload {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "stop_program");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "stop_program");
 
     @Override
     public ResourceLocation id() {
@@ -56,7 +56,7 @@ public record StopProgramPayload(UUID entityUuid, String programId, boolean cutO
     public static void handle(StopProgramPayload p, ServerPlayer player) {
         NumenPlayer companion = NumenPlayer.findByUuid(player.level.getServer(), p.entityUuid());
         if (companion == null || !companion.isOwnedByPlayer(player.getUUID())) {
-            NumenCore.LOG.debug("[numen-net] stop_program for {} ignored: not the sender's companion", p.entityUuid());
+            Constants.LOG.debug("[numen-net] stop_program for {} ignored: not the sender's companion", p.entityUuid());
             return;
         }
         if (p.cutOff()) {

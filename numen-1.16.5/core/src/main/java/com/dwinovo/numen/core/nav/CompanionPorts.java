@@ -8,10 +8,13 @@ import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.permission.Permission;
 import com.dwinovo.numen.pathing.api.Navigator;
 import com.dwinovo.numen.pathing.api.Ports;
+import com.dwinovo.numen.pathing.body.Snapshots;
+import com.dwinovo.numen.pathing.plan.CostModel;
 import com.dwinovo.numen.pathing.plan.Materials;
 import com.dwinovo.numen.pathing.plan.TerrainPolicy;
 import com.dwinovo.numen.pathing.plan.Threat;
 import com.dwinovo.numen.pathing.plan.Threats;
+import com.dwinovo.numen.pathing.spec.RouteSpec;
 
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.monster.Monster;
@@ -44,6 +47,11 @@ public final class CompanionPorts {
     /** 她的寻路门面：手是她的两只手，此刻的权限快照，垫路料从她背包里挑，威胁由调用方给。 */
     public static Navigator navigator(NumenPlayer player, Threats threats) {
         return Navigator.of(player, new Ports(player.hands(), terrain(player), materials(player), threats));
+    }
+
+    /** 按 {@code spec} 与她此刻的身体、端口组一份成本模型：估一格挖多久、许不许挖，与寻路用的是同一份定价。 */
+    static CostModel model(NumenPlayer player, RouteSpec spec) {
+        return CostModel.of(spec, Snapshots.of(player), terrain(player), materials(player), dangers(player));
     }
 
     /**

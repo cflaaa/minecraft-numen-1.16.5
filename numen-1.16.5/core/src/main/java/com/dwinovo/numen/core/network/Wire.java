@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.DecoderException;
@@ -245,7 +245,7 @@ public enum Wire {
             throw new IllegalStateException(payload.id() + " shrunk from " + size + " to " + after
                     + " bytes, still over the " + bytes + " bytes one payload " + name() + " carries");
         }
-        NumenCore.LOG.warn("[numen-net] {} came to {} bytes, over the {} bytes one payload {} "
+        Constants.LOG.warn("[numen-net] {} came to {} bytes, over the {} bytes one payload {} "
                 + "carries; sent its shrunk form ({} bytes)", payload.id(), size, bytes, name(), after);
         return shrunk;
     }

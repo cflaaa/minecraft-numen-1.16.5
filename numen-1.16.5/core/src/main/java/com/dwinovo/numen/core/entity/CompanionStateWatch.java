@@ -3,7 +3,7 @@ package com.dwinovo.numen.core.entity;
 import com.dwinovo.numen.core.network.payload.NumenStatePayload;
 import com.dwinovo.numen.core.network.payload.RequestStatePayload;
 import com.dwinovo.numen.core.network.NumenNetwork;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Inventory;
@@ -122,7 +122,7 @@ public final class CompanionStateWatch {
         NumenNetwork.sendToPlayer(owner, payload);
         // 一次推送一行。链路是"服务端推 → 客户端缓存 → 渲染进请求",出问题时得能一眼看出
         // 断在哪一节;只记开始不记结果的日志已经害过我们一次。
-        NumenCore.LOG.info(
+        Constants.LOG.info(
                 "[numen-state] {} → {} 种物品 / {} 格, 主手 {}, 副手 {}, 效果 {}{}{}{}",
                 companion.getName().getString(), kinds(payload), usedSlots(payload),
                 slotName(payload.selectedSlot(), payload.items()), name(payload.offhand()),

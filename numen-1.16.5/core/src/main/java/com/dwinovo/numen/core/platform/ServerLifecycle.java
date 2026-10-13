@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.platform;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -50,7 +50,7 @@ public final class ServerLifecycle {
             try {
                 drop.run();
             } catch (RuntimeException e) {
-                NumenCore.LOG.warn("[numen] 关服清理有一项失败,其余继续", e);
+                Constants.LOG.warn("[numen] 关服清理有一项失败,其余继续", e);
             }
         }
     }

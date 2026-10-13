@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.permission;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.data.ModLanguageData;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 
@@ -154,13 +154,13 @@ public final class ConsentDesk {
         if (!line.ownerPresent()) {
             ticket.answer = new ConsentAnswer(ConsentAnswer.Decision.DENY, OWNER_ABSENT);
             line.clear(Withdrawal.OWNER_ABSENT);
-            NumenCore.LOG.info("[numen-consent] {} ask #{} refused at once: owner offline", companion,
+            Constants.LOG.info("[numen-consent] {} ask #{} refused at once: owner offline", companion,
                     ticket.request.id());
             return ticket;
         }
         pending = ticket;
         line.show(ticket.request);
-        NumenCore.LOG.info("[numen-consent] {} ask #{}: {}", companion, ticket.request.id(),
+        Constants.LOG.info("[numen-consent] {} ask #{}: {}", companion, ticket.request.id(),
                 ConsentItem.listingText(items));
         return ticket;
     }
@@ -220,7 +220,7 @@ public final class ConsentDesk {
         }
         settle(ticket, answer);
         line.clear(null);
-        NumenCore.LOG.info("[numen-consent] {} #{} answered {}{}", companion, requestId, decision,
+        Constants.LOG.info("[numen-consent] {} #{} answered {}{}", companion, requestId, decision,
                 said.isEmpty() ? "" : ": " + said);
         return true;
     }
@@ -231,7 +231,7 @@ public final class ConsentDesk {
             return;
         }
         if (!line.ownerPresent() || line.gameTime() >= pending.request.expiresAtGameTime()) {
-            NumenCore.LOG.info("[numen-consent] {} #{} expired: {}", companion, pending.request.id(), OWNER_ABSENT);
+            Constants.LOG.info("[numen-consent] {} #{} expired: {}", companion, pending.request.id(), OWNER_ABSENT);
             settle(pending, new ConsentAnswer(ConsentAnswer.Decision.DENY, OWNER_ABSENT));
             line.clear(Withdrawal.OWNER_ABSENT);
         }

@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ public record PathDebugPayload(UUID companionId,
                                List<Long> goalBoxes, List<Long> goalColumns)
         implements NumenPayload {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "path_debug");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "path_debug");
 
     @Override
     public ResourceLocation id() {

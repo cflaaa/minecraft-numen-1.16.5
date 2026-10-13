@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.payload.FragmentPayload;
 import com.dwinovo.numen.core.network.payload.NumenDeathPayload;
 import com.dwinovo.numen.core.network.payload.NumenLocationsPayload;
@@ -110,7 +110,7 @@ public final class NumenNetwork {
     public static NumenPayload assembled(Fragments.Inbox inbox, FragmentPayload fragment) {
         Fragments.Outcome outcome = inbox.accept(fragment);
         if (outcome instanceof Fragments.Rejected rejected) {
-            NumenCore.LOG.warn("[numen-net] dropped a fragmented message: {}", rejected.why());
+            Constants.LOG.warn("[numen-net] dropped a fragmented message: {}", rejected.why());
             return null;
         }
         if (outcome instanceof Fragments.Complete whole) {
@@ -118,7 +118,7 @@ public final class NumenNetwork {
                     : TO_CLIENT.get(whole.kind());
             NumenPayload payload = route == null ? null : Fragments.decode(route.decoder(), whole.bytes());
             if (!(payload instanceof Wire.Fragmentable)) {
-                NumenCore.LOG.warn("[numen-net] dropped a fragmented {}: not a payload that goes as fragments",
+                Constants.LOG.warn("[numen-net] dropped a fragmented {}: not a payload that goes as fragments",
                         whole.kind());
                 return null;
             }

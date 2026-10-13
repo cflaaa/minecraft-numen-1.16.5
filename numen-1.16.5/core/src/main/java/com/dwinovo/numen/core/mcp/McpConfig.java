@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.mcp;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -19,7 +19,7 @@ import java.util.List;
  * <p>照搬上游 {@code api/common/src/client/.../mcp/server/McpConfig.java}，只改了两处：
  *
  * <ol>
- *   <li><b>日志</b>：上游用 {@code Constants.LOG}，这里用 {@link NumenCore}（本仓没有 {@code Constants}）；</li>
+ *   <li><b>日志</b>：上游用 {@code Constants.LOG}，这里用 {@link Constants}（本仓没有 {@code Constants}）；</li>
  *   <li><b>gson 写法</b>：上游用 {@code JsonParser.parseString(...)}（2.8.6 才有），
  *       这里用 {@code new JsonParser().parse(...)}——1.16.5 的类路径上带的是 gson 2.8.0。
  *       详见 docs/PORTING.md 3.4。</li>
@@ -73,7 +73,7 @@ public record McpConfig(
                     o.has("hidden_tools") ? strings(o, "hidden_tools") : DEFAULT_HIDDEN,
                     o.has("quiet_fallback") && o.get("quiet_fallback").getAsBoolean());
         } catch (IOException | RuntimeException ex) {
-            NumenCore.warn("[numen-mcp] 配置读不出来 {} —— 服务端按关闭处理：{}", file, ex.toString());
+            Constants.warn("[numen-mcp] 配置读不出来 {} —— 服务端按关闭处理：{}", file, ex.toString());
             return new McpConfig(false, LOOPBACK, 8765, "", 300, DEFAULT_HIDDEN, false);
         }
     }
@@ -151,9 +151,9 @@ public record McpConfig(
         try {
             Files.createDirectories(file.getParent());
             Files.writeString(file, o.toString(), StandardCharsets.UTF_8);
-            NumenCore.info("[numen-mcp] {} {}", what, file);
+            Constants.info("[numen-mcp] {} {}", what, file);
         } catch (IOException ex) {
-            NumenCore.warn("[numen-mcp] 配置写不出去 {}：{}", file, ex.toString());
+            Constants.warn("[numen-mcp] 配置写不出去 {}：{}", file, ex.toString());
         }
     }
 

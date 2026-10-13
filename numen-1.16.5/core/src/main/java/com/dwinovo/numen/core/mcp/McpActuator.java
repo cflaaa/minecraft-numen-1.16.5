@@ -2,7 +2,7 @@ package com.dwinovo.numen.core.mcp;
 
 import com.dwinovo.numen.agent.llm.ToolOutcome;
 import com.dwinovo.numen.agent.provider.LlmToolCall;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.CompanionBrain;
 import com.dwinovo.numen.core.agent.NumenTools;
 import com.dwinovo.numen.core.command.NumenCommand;
@@ -98,7 +98,7 @@ public final class McpActuator {
         return hop(false, s -> {
             ServerPlayer owner = Companions.firstOwner(s);
             if (owner == null) {
-                NumenCore.warn("[numen-mcp] 召唤 {} 失败：世界里没有玩家可以当主人", n);
+                Constants.warn("[numen-mcp] 召唤 {} 失败：世界里没有玩家可以当主人", n);
                 return false;
             }
             return Companions.spawn(s, owner, n) != null;
@@ -296,7 +296,7 @@ public final class McpActuator {
                 try {
                     value = work.apply(s);
                 } catch (RuntimeException ex) {
-                    NumenCore.warn("[numen-mcp] 调用失败：{}", ex.toString());
+                    Constants.warn("[numen-mcp] 调用失败：{}", ex.toString());
                 }
                 f.complete(value);
             });

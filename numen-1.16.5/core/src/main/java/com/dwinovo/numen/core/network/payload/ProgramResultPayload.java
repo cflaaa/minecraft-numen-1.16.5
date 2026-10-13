@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
 import com.dwinovo.numen.core.program.ProgramUplink;
@@ -23,7 +23,7 @@ import java.util.UUID;
 public record ProgramResultPayload(UUID entityUuid, String programId, String resultJson)
         implements NumenPayload {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "program_result");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "program_result");
 
     @Override
     public ResourceLocation id() {
@@ -43,7 +43,7 @@ public record ProgramResultPayload(UUID entityUuid, String programId, String res
 
     /** Client-side handler. */
     public static void handle(ProgramResultPayload p) {
-        NumenCore.LOG.debug("[numen-net] program_result entity={} id={} chars={}", p.entityUuid(), p.programId(),
+        Constants.LOG.debug("[numen-net] program_result entity={} id={} chars={}", p.entityUuid(), p.programId(),
                 p.resultJson().length());
         ProgramUplink.CONNECTION.deliver(p.programId(), RunResult.fromJson(p.resultJson()));
     }

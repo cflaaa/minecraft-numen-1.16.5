@@ -25,7 +25,7 @@ import java.util.Random;
  * 头顶不是液体（要能呼吸），并且放得下站立的玩家碰撞箱。
  *
  * <p>照上游 {@code api/entity/SafeSpawn.java} 搬（2026-10-11 归位阶段 2，真机试跑发现本仓
- * 的召唤少了这一层）。1.16.5 适配：{@code RandomSource} 这一代还没有，{@link ServerLevel#getRandom()}
+ * 的召唤少了这一层）。1.16.5 适配：{@code Random} 这一代还没有，{@link ServerLevel#getRandom()}
  * 返回 {@code java.util.Random}；{@code BlockPos.containing(Vec3)} 也还没有，用三参构造器。
  */
 final class SafeSpawn {

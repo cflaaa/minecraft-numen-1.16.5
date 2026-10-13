@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.entity;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.pathing.body.Body;
 import com.dwinovo.numen.pathing.body.BodyCompat;
 import com.dwinovo.numen.pathing.body.Controls;
@@ -94,6 +94,47 @@ public final class NumenPlayer extends ServerPlayer implements Body {
         // 这一代 ServerPlayer 构造时把迈步高度设成 1.0（迁就客户端的自动起跳），
         // 真玩家是 0.6。不修的话一格高的台阶会被直接迈上去，寻路算出来的路也跟着错。
         BodyCompat.walkLikeAPlayer(this);
+    }
+
+    /**
+     * 上游 1.20.1 代码使用的玩家便捷访问器；1.16.5 对应值是公开字段。
+     * 放在同伴子类上，避免全仓把上游表达式改成版本特有字段访问。
+     */
+    public Level level() {
+        return this.level;
+    }
+
+    public ServerLevel serverLevel() {
+        return (ServerLevel) this.level;
+    }
+
+    public Inventory getInventory() {
+        return this.inventory;
+    }
+
+    /** 1.16.5 exposes the grounded state and rotation as fields/public accessors. */
+    public boolean onGround() {
+        return isOnGround();
+    }
+
+    public int getBlockX() { return blockPosition().getX(); }
+    public int getBlockY() { return blockPosition().getY(); }
+    public int getBlockZ() { return blockPosition().getZ(); }
+
+    public net.minecraft.world.level.ChunkPos chunkPosition() {
+        return new net.minecraft.world.level.ChunkPos(blockPosition());
+    }
+
+    public float getYRot() { return yRot; }
+    public void setYRot(float yaw) { yRot = yaw; }
+    public void setXRot(float pitch) { xRot = pitch; }
+
+    public boolean hasLineOfSight(net.minecraft.world.entity.Entity entity) {
+        return level.clip(new net.minecraft.world.level.ClipContext(
+                getEyePosition(1.0F), entity.getEyePosition(1.0F),
+                net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                net.minecraft.world.level.ClipContext.Fluid.NONE, this))
+                .getType() == net.minecraft.world.phys.HitResult.Type.MISS;
     }
 
     /**
@@ -504,7 +545,7 @@ public final class NumenPlayer extends ServerPlayer implements Body {
             return;
         }
         tickFailureLogged = true;
-        NumenCore.error("同伴 {} 的 tick 抛了异常，这一 tick 跳过（之后不再重复记这一条）", getUUID(), ex);
+        Constants.error("同伴 {} 的 tick 抛了异常，这一 tick 跳过（之后不再重复记这一条）", getUUID(), ex);
     }
 
     @Override

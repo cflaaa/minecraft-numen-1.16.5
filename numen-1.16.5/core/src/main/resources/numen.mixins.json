@@ -7,8 +7,13 @@
         "BlockItemPlaceMixin",
         "BoatAccessor",
         "ChunkMapCompanionMixin",
+        "CraftingMenuAccessor",
+        "FishingHookAccessor",
         "ItemEntityTouchMixin",
-        "MenuDataSlotsAccessor"
+        "ItemEntityAccessor",
+        "MenuDataSlotsAccessor",
+        "ServerLevelBlockChangeMixin",
+        "SlotAccessor"
     ],
     "client": [
         "client.NumenOfflineMultiplayerMixin"

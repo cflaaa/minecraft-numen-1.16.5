@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.task;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 
 import com.dwinovo.numen.core.entity.CompanionChunkLoader;
 import com.dwinovo.numen.core.entity.Companions;
@@ -100,7 +100,7 @@ public final class CompanionTickDispatcher {
     public static void tick(MinecraftServer server) {
         if (!heartbeatLogged) {
             heartbeatLogged = true;
-            NumenCore.LOG.info("[numen-task] scheduler heartbeat online (first server tick)");
+            Constants.LOG.info("[numen-task] scheduler heartbeat online (first server tick)");
         }
         // 登录时只记了一笔,恢复放在这儿做——那时 placeNewPlayer 早已返回,同伴出什么事
         // 都落不到主人的入场流程上。见 Companions.scheduleRestoreFor。
@@ -164,7 +164,7 @@ public final class CompanionTickDispatcher {
                     // 一遍她手上的活。这里只吵一句就跳过;病根在"她被复活了两次",
                     // 见 OwnedBody。
                     if (duplicateWarned.add(ap.getUUID())) {
-                        NumenCore.LOG.warn(
+                        Constants.LOG.warn(
                                 "[numen-task] {} 同时有两具身体在玩家列表里,忽略后来的那具", ap.getUUID());
                     }
                     continue;
@@ -172,7 +172,7 @@ public final class CompanionTickDispatcher {
                 if (!brain.boundTo(ap)) {
                     // 到不了这里（关服已经清过表）—— 到了就是哪处漏了，大声记一笔。
                     // 整个大脑作废：里面的任务都绑在旧身体上，一个都不能再 tick。
-                    NumenCore.LOG.warn(
+                    Constants.LOG.warn(
                             "[numen-task] {} 换了身体但旧大脑还在，整个作废重建", ap.getUUID());
                     BRAINS.remove(ap.getUUID());
                     brain = brainFor(ap.getUUID());

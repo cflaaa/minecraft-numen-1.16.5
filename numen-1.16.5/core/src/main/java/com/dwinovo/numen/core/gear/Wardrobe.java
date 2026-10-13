@@ -30,7 +30,7 @@ import java.util.Set;
  * <p>货源只在背包的 36 格里找：身上穿着的、副手握着的不是「背包里的这件」。东西只在背包和身上之间搬，
  * 绝不掉在地上——放不下就在动手之前拒绝。只在服务端主线程调用。
  *
- * <p>照上游 {@code core/gear/Wardrobe.java} 逐字搬（1.16.5 适配：{@code BuiltInRegistries.ITEM} →
+ * <p>照上游 {@code core/gear/Wardrobe.java} 逐字搬（1.16.5 适配：{@code Registry.ITEM} →
  * {@link Registry#ITEM}、{@code body.getInventory()} → {@code body.inventory} 字段）。
  */
 public final class Wardrobe {

@@ -2,7 +2,7 @@ package com.dwinovo.numen.core.mcp;
 
 import com.dwinovo.numen.agent.llm.ToolOutcome;
 import com.dwinovo.numen.agent.provider.IToolSpec;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.NumenTools;
 import com.google.gson.Gson;
 import com.google.gson.JsonArray;
@@ -186,7 +186,7 @@ public final class McpServer {
                 }
             }
         } catch (RuntimeException fatal) {
-            NumenCore.warn("[numen-mcp] 请求失败：{}", fatal.toString());
+            Constants.warn("[numen-mcp] 请求失败：{}", fatal.toString());
             try {
                 respond(ex, 500, "");
             } catch (IOException ignored) {
@@ -448,7 +448,7 @@ public final class McpServer {
             return;
         }
         String argsLine = argsSummary(args);
-        NumenCore.info("[numen-mcp] 调用 {}{} → {}", name, argsLine.isBlank() ? "" : "  " + argsLine,
+        Constants.info("[numen-mcp] 调用 {}{} → {}", name, argsLine.isBlank() ? "" : "  " + argsLine,
                 truncate(textOf(out), 200));
     }
 

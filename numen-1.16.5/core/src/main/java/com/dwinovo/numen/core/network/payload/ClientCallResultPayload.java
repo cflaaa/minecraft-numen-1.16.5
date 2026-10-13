@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
 import com.dwinovo.numen.core.program.ModuleSet;
@@ -22,7 +22,7 @@ import java.util.UUID;
 public record ClientCallResultPayload(UUID entityUuid, String callId, String replyJson, Optional<ModuleSet> modules)
         implements NumenPayload, Wire.Fragmentable {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "client_call_result");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "client_call_result");
 
     @Override
     public ResourceLocation id() {

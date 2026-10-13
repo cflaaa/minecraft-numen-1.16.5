@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.script;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.agent.script.ApiError;
 import com.dwinovo.numen.agent.script.ErrorKind;
 import com.dwinovo.numen.agent.script.ScriptEngine;
@@ -170,7 +170,7 @@ public final class ModuleApi {
                     + "saying what it does", ScriptEngine.IN_USE.comment("Dig every block given, nearest first."));
         }
         Modules.Saved saved = modules.save(name, code);
-        NumenCore.LOG.info("[numen-script] {} {} in {}", saved, name, modules.dir());
+        Constants.LOG.info("[numen-script] {} {} in {}", saved, name, modules.dir());
         return new Saved(name, saved);
     }
 
@@ -183,7 +183,7 @@ public final class ModuleApi {
         if (modules.delete(args.name()) == null) {
             throw new ApiError(ErrorKind.NOT_FOUND, missing(args.name(), modules), Call.of("numen.module.list"));
         }
-        NumenCore.LOG.info("[numen-script] deleted {} in {}", args.name(), modules.dir());
+        Constants.LOG.info("[numen-script] deleted {} in {}", args.name(), modules.dir());
     }
 
     @Fn("Put a built-in module back as it shipped with this version: your changes go, a deleted one comes back.")
@@ -197,7 +197,7 @@ public final class ModuleApi {
             throw new ApiError(ErrorKind.NOT_FOUND, "nothing named " + args.name() + " ships with this version; only "
                     + "a built-in module can be reset", Call.of("numen.module.list"));
         }
-        NumenCore.LOG.info("[numen-script] reset {} in {}", args.name(), modules.dir());
+        Constants.LOG.info("[numen-script] reset {} in {}", args.name(), modules.dir());
     }
 
     /** 下一个空着的 {@code my.module_N}。 */

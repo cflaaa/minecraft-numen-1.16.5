@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.platform;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.platform.services.INumenConfig;
 import com.dwinovo.numen.core.platform.services.INetworkChannel;
 import com.dwinovo.numen.core.platform.services.IPlatformHelper;
@@ -23,7 +23,7 @@ public class Services {
         final T loadedService = ServiceLoader.load(clazz, Services.class.getClassLoader())
                 .findFirst()
                 .orElseThrow(() -> new NullPointerException("Failed to load service for " + clazz.getName()));
-        NumenCore.LOG.debug("Loaded {} for service {}", loadedService, clazz);
+        Constants.LOG.debug("Loaded {} for service {}", loadedService, clazz);
         return loadedService;
     }
 }

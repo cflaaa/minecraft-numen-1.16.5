@@ -1,7 +1,7 @@
 package com.dwinovo.numen.core.entity;
 
 import com.dwinovo.numen.agent.inbox.EventQueue;
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.CompanionBrain;
 import com.dwinovo.numen.core.api.CompanionEvent;
 import com.dwinovo.numen.core.api.NumenPlugins;
@@ -107,7 +107,7 @@ public final class Companions {
 
         CompanionBrain brain = new CompanionBrain(body);
         BRAINS.put(body.getUUID(), brain);
-        NumenCore.info("同伴 {} 已召唤，主人 {}", name, owner.getGameProfile().getName());
+        Constants.info("同伴 {} 已召唤，主人 {}", name, owner.getGameProfile().getName());
         return body;
     }
 
@@ -170,7 +170,7 @@ public final class Companions {
         body.teleportTo(pos.x, pos.y, pos.z);
         BRAINS.put(body.getUUID(), new CompanionBrain(body));
         reg.put(companionUuid, fresh.movedTo(level.dimension(), body.blockPosition()));
-        NumenCore.info("同伴 {} 已召唤，主人 {}", name, ownerUuid);
+        Constants.info("同伴 {} 已召唤，主人 {}", name, ownerUuid);
         return body;
     }
 
@@ -191,7 +191,7 @@ public final class Companions {
             brain.halt("被主人遣散");
         }
         CompanionFactory.despawn(server, body);
-        NumenCore.info("同伴 {} 已遣散", name);
+        Constants.info("同伴 {} 已遣散", name);
         return true;
     }
 
@@ -272,7 +272,7 @@ public final class Companions {
                 brain.tick();
             } catch (RuntimeException ex) {
                 // 一只同伴的大脑炸了不能连累别人，更不能掀掉服务端主循环。
-                NumenCore.error("同伴 {} 的大脑 tick 抛了异常，跳过这一步", brain.name(), ex);
+                Constants.error("同伴 {} 的大脑 tick 抛了异常，跳过这一步", brain.name(), ex);
             }
         }
     }
@@ -421,7 +421,7 @@ public final class Companions {
             try {
                 restore.accept(ownerUuid);
             } catch (RuntimeException ex) {
-                NumenCore.error("恢复 {} 的同伴时出错", ownerUuid, ex);
+                Constants.error("恢复 {} 的同伴时出错", ownerUuid, ex);
             }
         }
     }
@@ -440,7 +440,7 @@ public final class Companions {
                     respawn(server, e.getKey());
                 }
             } catch (RuntimeException ex) {
-                NumenCore.error("同伴 {} 没能回到世界里，跳过", e.getKey(), ex);
+                Constants.error("同伴 {} 没能回到世界里，跳过", e.getKey(), ex);
             }
         }
         if (owner != null) {
@@ -461,7 +461,7 @@ public final class Companions {
         }
         for (NumenEventPayload p : outboxPayloads(EventOutbox.get(server), companions, System.currentTimeMillis())) {
             NumenNetwork.sendToPlayer(owner, p);
-            NumenCore.info("{} 补发 {} 条离线输入", p.entityUuid(), p.entries().size());
+            Constants.info("{} 补发 {} 条离线输入", p.entityUuid(), p.entries().size());
         }
     }
 

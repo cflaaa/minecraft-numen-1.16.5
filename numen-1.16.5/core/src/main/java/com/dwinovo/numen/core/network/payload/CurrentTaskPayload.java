@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.network.Wire;
 import net.minecraft.network.FriendlyByteBuf;
@@ -34,7 +34,7 @@ public record CurrentTaskPayload(UUID entityUuid, String taskId, String tool,
                                  String describe, boolean standing, long elapsedMs)
         implements NumenPayload, Wire.Oversized<CurrentTaskPayload> {
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "current_task");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "current_task");
 
     @Override
     public ResourceLocation id() {

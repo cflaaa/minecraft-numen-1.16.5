@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.entity;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.TicketType;
@@ -95,7 +95,7 @@ public final class CompanionChunkLoader {
             if (crossed) {
                 // pad 中心迁移打点(debug 级:诊断用,走路的同伴几秒跨一个 chunk,不该刷正式日志;
                 // 需要时开 debug.log 或调日志级别即可看到)。
-                NumenCore.LOG.debug("[numen-pad] {} pad center -> chunk {},{}",
+                Constants.LOG.debug("[numen-pad] {} pad center -> chunk {},{}",
                         companion.getName().getString(), pos.x, pos.z);
             }
             st.chunk = packed;

@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.net;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.CompanionBrain;
 import com.dwinovo.numen.core.command.NumenCommand;
 import com.dwinovo.numen.core.config.NumenConfig;
@@ -39,12 +39,12 @@ public final class NumenPanelServer {
                     try {
                         json = buf.readUtf(32767);
                     } catch (RuntimeException ex) {
-                        NumenCore.warn("[numen-panel] 收包读不出来：{}", ex.toString());
+                        Constants.warn("[numen-panel] 收包读不出来：{}", ex.toString());
                         return;
                     }
                     server.execute(() -> handle(server, player, json));
                 });
-        NumenCore.info("[numen-panel] G 面板通道已注册");
+        Constants.info("[numen-panel] G 面板通道已注册");
     }
 
     private static void handle(MinecraftServer server, ServerPlayer player, String json) {
@@ -192,7 +192,7 @@ public final class NumenPanelServer {
         }
         String missing = NumenConfig.get().missingReason();
         if (missing != null) {
-            NumenCore.warn("[numen-panel] 同伴 {} 已召唤，但还不能干活：{}", name, missing);
+            Constants.warn("[numen-panel] 同伴 {} 已召唤，但还不能干活：{}", name, missing);
         }
         return null;
     }
@@ -244,7 +244,7 @@ public final class NumenPanelServer {
             }
         }
         NumenConfig.save();
-        NumenCore.info("[numen-panel] 配置 {} 已更新", key);
+        Constants.info("[numen-panel] 配置 {} 已更新", key);
         return null;
     }
 }

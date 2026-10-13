@@ -1,6 +1,6 @@
 package com.dwinovo.numen.core.network.payload;
 
-import com.dwinovo.numen.core.NumenCore;
+import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.network.NumenPayload;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.permission.ConsentAnswer;
@@ -29,7 +29,7 @@ public record ConsentReplyPayload(UUID companion, long requestId, ConsentAnswer.
 
     public static final int MAX_NOTE_LENGTH = 512;
 
-    public static final ResourceLocation ID = new ResourceLocation(NumenCore.MOD_ID, "consent_reply");
+    public static final ResourceLocation ID = new ResourceLocation(Constants.MOD_ID, "consent_reply");
 
     @Override
     public ResourceLocation id() {
@@ -55,18 +55,18 @@ public record ConsentReplyPayload(UUID companion, long requestId, ConsentAnswer.
     public static void handle(ConsentReplyPayload p, ServerPlayer player) {
         NumenPlayer companion = NumenPlayer.findByUuid(player.level.getServer(), p.companion());
         if (companion == null) {
-            NumenCore.LOG.debug("[numen-net] consent_reply for unknown companion {}", p.companion());
+            Constants.LOG.debug("[numen-net] consent_reply for unknown companion {}", p.companion());
             return;
         }
         if (p.decision() != ConsentAnswer.Decision.DENY && !p.note().isBlank()) {
-            NumenCore.LOG.warn("[numen-net] ✗ consent_reply rejected from {}: a note only goes with a deny",
+            Constants.LOG.warn("[numen-net] ✗ consent_reply rejected from {}: a note only goes with a deny",
                     player.getName().getString());
             return;
         }
         switch (ConsentDesk.reply(player, companion, p.requestId(), p.decision(), p.note())) {
-            case NOT_OWNER -> NumenCore.LOG.warn("[numen-net] ✗ consent_reply rejected from {}: not the owner",
+            case NOT_OWNER -> Constants.LOG.warn("[numen-net] ✗ consent_reply rejected from {}: not the owner",
                     player.getName().getString());
-            case NOT_PENDING -> NumenCore.LOG.info("[numen-net] consent_reply #{} for {} no longer pending",
+            case NOT_PENDING -> Constants.LOG.info("[numen-net] consent_reply #{} for {} no longer pending",
                     p.requestId(), p.companion());
             case ANSWERED -> { }
         }
