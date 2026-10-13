@@ -52,3 +52,30 @@ Numen 模组 **1.20.1 → 1.16.5 Fabric** 移植。仓库 `numen-1.16.5/`，上�
 
 ## git
 仓库根 = 工作区根（`user.name=cfl`）。忽略 `.toolchain/`、`.testserver/`、`ref/`、`**/build/`、`logs/`、`ssh-run.py`、`.workbuddy-ai/tmp/`。大改动优先 git 回退；**验证过了才提交，一次一刀**。
+
+## ⚠️ 硬教训：`.gitignore` 的 `**/build/` 会误伤源码包（2026-10-13）
+
+源码树里有**真叫 `build` 的包**（`com.dwinovo.numen.core.build`、`core.task.build`）。
+`**/build/` 会把它们连坐忽略 → **从未入库** → 工作树一丢就找不回。
+已加 `!**/src/**/build/` 放行。**凡加通配忽略，先确认源码树里没有同名目录。**
+
+**恢复手法（已沉淀）**：源码丢了但**已部署的 jar** 还在时——
+`jar xf` 抽 class → `tiny-remapper`(intermediary→named，带 ASM 组 classpath) → CFR 反编译 →
+按 `mappings.tiny` 文本重映射残留 `method_*/field_*`。比重新适配上游快且准。
+
+## ⭐ git 保存方式（2026-10-13 事故后定稿，细则看 `numen-1.16.5/docs/GIT_SAFETY.md`）
+
+**背景**：一次 `git rm` 后 `core/src` 379 文件被整体删除（诱因不明）；其中 21 个文件因 `.gitignore`
+的 `**/build/` 误伤源码里真叫 build 的包而**从未入库**，只能反编译已部署 jar 救回。
+
+**规矩（按优先级）**：
+1. **动很多文件前先快照**：`python tools/git-snapshot.py`（历史 bundle + 工作树原样，备份到仓库外
+   `../我的世界-backup/`）。适用于 `git rm/clean/reset`、批量改写/搬运脚本、反编译流水线。
+2. **一刀内编译一绿就提 `WIP:` 提交**；收尾 `git reset --soft <刀起点>` 压成一个刀提交
+   —— 中间状态有备份，最终历史仍"一次一刀"。（原"验证过了才提交"被误用成攒一大批，是这次差点全丢的主因。）
+3. **改 `.gitignore` 后必跑 `python tools/git-audit.py`**；`pre-commit` 钩子已装，SUSPECT 直接拦提交。
+4. **模型中断回来后先体检再继续**：`git status` + `tools/git-audit.py`。
+5. **恢复路径**：工作树被删 → `git restore --worktree -- <路径>`；误 reset → `git reflog`；
+   全毁+有未提交 → 解开快照里的 tarball + bundle。
+6. **可复用脚本进 `tools/`（入库）**，一次性脚本才留 `.workbuddy-ai/tmp/`。
+7. 钩子不入库，换机器重跑 `python tools/install-hooks.py`。

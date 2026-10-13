@@ -146,6 +146,8 @@ JAVA_HOME="../.toolchain/jdk-17.0.20.1+1" ../.toolchain/gradle-7.6.4/bin/gradle 
 1. 每把刀：编译 + 单测 + jar 类数比对 + 真机验收 → **更新本文件**（含验收台账一行）→ git 提交（一次一刀）。
 2. **用户拍板（2026-10-12）**：之后的修改、更新、修 bug 等，都要在**实际测试完成后及时**记录到本文件，不等攒批。
 3. 计划与方向变更先过 `DECISIONS.md`，本文件只记事实与状态。
+4. **保存方式**（2026-10-13 事故后定稿，细则 `docs/GIT_SAFETY.md`）：动很多文件前先 `tools/git-snapshot.py`；
+   一刀内编译一绿提 `WIP:`、收尾 `reset --soft` 压成一个刀提交；改 `.gitignore` 后必跑 `tools/git-audit.py`（钩子自动拦）。
 
 ---
 
