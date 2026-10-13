@@ -121,6 +121,7 @@
 
 | 日期 | 决策 / 事件 | 落地 |
 |---|---|---|
+| 2026-10-13 | **环境B 专项通过**：刀 4 jar 部署 NAS 容器（25586）+ 本机**纯原版**客户端跨机进服全绿。查清「自动进服时好时坏」真凶 = 1.16.5 `--server` 受 `serversAllowed()` 门控、假 token 下取决于能否连上 Mojang；测试脚本改用死代理（`--proxyHost 127.0.0.1 --proxyPort 1`）逼离线兜底 → 14s 确定性通过 | `PORTING.md` §18、`STATUS.md` |
 | 2026-10-13 | **刀 4 完成**：13 任务族 + tools/scan/route/nav/area/blueprint/combat/act/init 照搬，`Acts.java` 退役；真机验收全过（当场修 3 缺陷：结构注册表静态化、搜索/寻路 tick 挂载遗漏、ServerLevelBlockChangeMixin 补齐）；jar 968 = core 733 + pathing 235 | 刀 4 提交、STATUS.md |
 | 2026-10-12 | **D-09 状态台账制度**：新建 `docs/STATUS.md` 活台账（逐刀进度+真机验收台账）；拍板**之后的修改/更新都要在实际测试完成后及时记录**；当前暂停推进（刀 4 未开工） | `STATUS.md` |
 | 2026-10-12 | 刀 3 完成：上游 `agent/tool`+`agent/skill`+`NoteBook`+`Constants` 照搬进 agent；core 新增 `ToolRunner`/`WorldTool` 统一派发；删 `CompanionScript.java`；真机 15 工具 / MCP 19 工具验通 | 刀 3 提交 |

@@ -4,7 +4,7 @@
 > 之后的修改、更新、修 bug 同样要在实际测试完成后及时记录进来（2026-10-12 拍板）。
 > 分工：决策看 `DECISIONS.md`，技术细节与踩坑看 `PORTING.md`（引用 §号），执行计划看 `RESTORE_PLAN_V3.md`。
 
-**最后更新**：2026-10-13（刀 4 真机验收通过后）
+**最后更新**：2026-10-13（刀 4 真机验收 + 环境B 专项通过后）
 
 ---
 
@@ -12,6 +12,7 @@
 
 - **策略**：方案甲 —— 上游文件逐字照搬，只在 1.16.5 API 真不同处适配（A类照搬 / B类适配）。
 - **已落地**：刀 1a / 1b / 2 / 3 / **4** 全部提交并真机验收；工作树干净。
+- **双环境验收**：环境A（本机 `.testserver/` 完整回归）✅；**环境B（NAS 真实部署 + 跨机原版客户端）✅**（2026-10-13）。
 - **构建**：`:core:build` 绿；发行 jar **968 类 = core 733 + pathing 235**；五件套嵌入
   （agent / ai / lua / slf4j-api 1.7.36 / log4j-slf4j-impl 2.8.1）。
 - **下一步**：刀 5（清理收口：导航壳 / G 面板与 MCP 版本漂移 / server-api-check / 文档）。
@@ -91,8 +92,10 @@
 
 ## 四、真机验收台账（测过什么）
 
-**环境**：本机 `.testserver/` Fabric 1.16.5 端口 **25565** + 本机客户端 + MCP 端口 8766（服务端控制台 stdin 可用）；
-驱动 `_perm_live_common.py`；用例脚本在 `.workbuddy-ai/tmp/`。
+**环境A**（默认）：本机 `.testserver/` Fabric 1.16.5 端口 **25565** + 本机客户端 + MCP 端口 8766
+（服务端控制台 stdin 可用）；驱动 `_perm_live_common.py`；用例脚本在 `.workbuddy-ai/tmp/`。
+**环境B**（真实部署）：NAS `192.168.1.149` 容器 `mc1165-test` 端口 **25586**（online-mode=false）；
+部署 `deploy-knife4-nas.py`（SSH 传 jar → restart → 验日志），跨机客户端 `vanilla-nas-e2e.py`。
 
 | 日期 | 脚本 | 对应刀 | 验证通过的能力 |
 |---|---|---|---|
@@ -106,6 +109,8 @@
 | 2026-10-13 | `smoke-刀4.py` | 4 | 模组加载行 ✅ / 模组相关报错无 / 控制台 stdin 可写（MCP 端口属外脑进程，服务端不宿主，冒烟不判） |
 | 2026-10-13 | `enum-刀4.py` | 4 | MCP `tools/list` 19 个 + Alice 召唤成功 + 工具清单存 `knife4-tools-enum.txt` |
 | 2026-10-13 | `accept4.py` | 4 | ① API 索引 **17 组**全登记 ② task status/timer/stop ③ **13 任务族冒烟 10/10**（status.self/scan.blocks 修复后返值正常；move.follow·work.dig·use.block·gear.wear 按预期报参数/距离/缺料错=派发链通）④ 权限闸 drop→ask#1→allow→「丢掉了 Block of Gold ×1」⑤ 完整链一段 Lua 连跑多族；`numen-scan` 心跳日志：`stone r=16 → 1 hit(s) … 1 tick(s)` |
+| 2026-10-13 | `deploy-knife4-nas.py` | 4 | **环境B 部署**：新 jar 传 NAS 容器 `mc1165-test`(192.168.1.149:25586) → restart → 加载行 ✅ / 异常 0 / 排程心跳上线 |
+| 2026-10-13 | `vanilla-nas-e2e.py` | 兼容 | **环境B 跨机**：本机**纯原版**客户端直连 NAS 服 → `Vanilla joined the game` ✅ / 客户端真异常 0 / 服务端自定义通道告警 0（14s，确定性；门控坑见 §六 + PORTING §18） |
 
 ## 五、构建与产物基线
 
@@ -130,6 +135,11 @@ JAVA_HOME="../.toolchain/jdk-17.0.20.1+1" ../.toolchain/gradle-7.6.4/bin/gradle 
 - **gson 2.8.0**：无 `parseString`/`keySet()`/`deepCopy` → 走 `JsonCompat`；勿内嵌新版 gson。
 - **发行 jar 丢 pathing 类**：core+pathing 均已 `remapperIsolation.set(true)`。
 - 本机 `http_proxy` 会代理 localhost → Python 用 `ProxyHandler({})`，curl 用 `--noproxy '*'`。
+- **原版 `--server` 自动进服被 `serversAllowed()` 门控**（1.16.5 `Minecraft` 构造 line 429：
+  `if (allowsMultiplayer() && server.hostname != null)`）。假 token 下：认证请求**能连上** Mojang →
+  真实 `YggdrasilSocialInteractionsService.serversAllowed()=false` → **不自动进服、停主菜单**；
+  认证请求**失败** → `OfflineSocialInteractions.serversAllowed()=true` → 正常进服。故该测试曾随网络状态时好时坏；
+  测试脚本已加 `--proxyHost 127.0.0.1 --proxyPort 1`（死 SOCKS 代理）逼走离线兜底 → **与网络解耦、14s 稳定**（PORTING §18）。
 
 ## 七、维护约定
 

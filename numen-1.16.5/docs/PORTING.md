@@ -1815,4 +1815,75 @@ Lua 脚本执行都在主线程**。单人服无感，10 个玩家各带一个�
 [`RESTORE_PLAN_V2.md`](./RESTORE_PLAN_V2.md) §6。
 顺带：`ProgramLimits` 就在 `program/` 服务端半边里，搬它正好补上本文上面记的那个「多人服优先项」。
 
+---
+
+## 十八、环境B：真实部署 + 跨机原版客户端（2026-10-13）
+
+### 18.1 做了什么
+把刀 4 的 jar 部署到 NAS 上的真实容器（`192.168.1.149:25586`，`mc1165-test`，online-mode=false），
+再从**本机**用**纯原版**客户端跨机连进去 —— 一次验证「真实部署 + 跨网访问 + 原版兼容」三件事。
+- 部署：`deploy-knife4-nas.py`（SSH 传 jar → `docker compose restart` → 等 `Done (` → 查加载行/异常）。
+- 客户端：`vanilla-nas-e2e.py`（同一份客户端 jar，摘掉 3 个 fabric 库，主类换回
+  `net.minecraft.client.main.Main`，`--server 192.168.1.149 --port 25586`）。
+- 判据（以服务端为准）：NAS 日志出现 `Vanilla joined the game`，客户端 0 真异常、进程存活、服务端 0 自定义通道告警。
+
+### 18.2 卡了半天的真凶：`--server` 自动进服被 `serversAllowed()` 门控
+现象：客户端起得来、atlas 全建完，但日志**从不出现 `Connecting to …`**，jstack 显示 Render 线程停在
+`glfwWaitEventsTimeout`（主菜单 idle）。同样的脚本、同样的命令行，**有时进、有时不进**，且与 IP 无关。
+
+反编译（loom 缓存的 `minecraft-merged-named.jar` + CFR 0.0.9）后定位到 `net.minecraft.client.Minecraft` 构造函数：
+
+```java
+this.socialInteractionsService = this.createSocialInteractions(authService, gameConfig);  // line 420
+...
+if (this.allowsMultiplayer() && gameConfig.server.hostname != null) {   // line 429
+    string = gameConfig.server.hostname;    // → line 526: new ConnectScreen(...)（自动进服）
+    i = gameConfig.server.port;
+} else {
+    string = null;                          // → line 528: new TitleScreen(true)（停主菜单）
+}
+...
+public boolean allowsMultiplayer() {        // line 1758
+    return this.allowsMultiplayer && this.socialInteractionsService.serversAllowed();
+}
+```
+
+`createSocialInteractions`（line 566）：
+
+```java
+try {
+    return authService.createSocialInteractionsService(accessToken);   // 会发一个到 Mojang 的请求
+} catch (AuthenticationException e) {
+    LOGGER.error("Failed to verify authentication", e);
+    return new OfflineSocialInteractions();      // authlib：serversAllowed() == true
+}
+```
+
+**结论**：我们用的是假 token（`accessToken = "0"`）。
+- 认证请求**失败**（连不上 Mojang，超时/拒绝）→ `OfflineSocialInteractions`，`serversAllowed()=true` → **自动进服** ✅
+- 认证请求**成功**（能连上 Mojang，比如开了代理/VPN）→ 真实 `YggdrasilSocialInteractionsService`，
+  假 token 下 `serversAllowed()=false` → `allowsMultiplayer()` 为假 → **不建 ConnectScreen、停主菜单** ❌
+
+这就解释了「时好时坏」：**取决于跑测试时本机能不能连上 Mojang**。与 mod、与 NAS、与 IP 全无关。
+
+### 18.3 修法：用死代理把认证请求钉死在失败路径
+`Main` 支持 `--proxyHost` / `--proxyPort`（line 80-82；line 104-107 据此构造 SOCKS 代理）：
+
+```python
+game += ["--server", IP, "--port", PORT]
+game += ["--proxyHost", "127.0.0.1", "--proxyPort", "1"]   # 死代理 → 认证请求立即 Connection refused
+```
+
+认证请求秒失败 → 必走 `OfflineSocialInteractions` → 稳定自动进服。游戏本体走**裸 socket**，不受此代理影响。
+> 副作用：认证失败栈里会多 4 行 `Caused by: java.net.SocketException: Connection refused`，属**故意制造**的良性噪声，
+> 已在测试脚本 BENIGN 过滤里放行（未进服时脚本在过滤前就 `return 1`，不会假通过）。
+> 修后：**14s 稳定通过**（修前要么 15s 超时碰运气、要么直接失败）。
+
+### 18.4 一个带偏了方向的旁证：残留客户端进程（已顺手加固）
+排查途中发现两个**上一次失败运行泄漏的** `net.minecraft.client.main.Main` 僵尸进程
+（脚本失败分支没收尾 kill），它们抢占 `gameDir/logs/latest.log`，日志出现
+`Unable to move file … 另一个程序正在使用此文件`。清理后测试**恰好**通过，一度被误判为根因。
+实际它只是**并发的日志锁问题**：已在脚本里补「启动前清场 + 失败分支也 kill + 失败自动 dump 线程栈」，
+但它**不是**不自动进服的原因 —— 真凶是 §18.2。
+
 
