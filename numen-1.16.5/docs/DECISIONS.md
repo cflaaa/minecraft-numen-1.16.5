@@ -97,7 +97,7 @@
 - **接缝**：v3 已从 3 处降到 **2 处**（都在 `ServerPrograms.ownerLeft`），按 C 类登记。
 - **统一验收**：`:core:build` 绿 → `:core:test` 全绿 → 发行 jar 类名逐个比对无缺无多 →
   **本机方案真机不回归** → 文档 + 记忆 → git 提交（一次一刀）。
-- **搬运脚本**：`.workbuddy-ai/tmp/port-sdk-task.py`（一条命令重放，1 秒）。
+- **搬运脚本**：`tools/port-sdk-task.py`（一条命令重放，1 秒）。
 
 ### ⚠️ 已知：计划覆盖不全（2026-10-11 全量审计）
 

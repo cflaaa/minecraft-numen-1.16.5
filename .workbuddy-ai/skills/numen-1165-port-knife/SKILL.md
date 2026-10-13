@@ -31,7 +31,7 @@ agent_created: true
 
 ⚠️ **规模数字一律以「脚本干跑 + `git status` 数」为准，不许估**（本项目估过两次都错，误差 24%~35%）。
 
-搬运脚本：`.workbuddy-ai/tmp/port-sdk-task.py`
+搬运脚本：`tools/port-sdk-task.py`
 - 一条命令重放（拷文件 + 改包名 + 改跨包 import，约 1 秒）
 - 干跑一次后 `git status --short | wc -l` 数文件、`git diff --stat` 数行
 - `program/` 传输半边 8 文件在排除名单；`network.*` **故意不改包名**（让编译错误直接指出「这层没有」）
@@ -40,7 +40,7 @@ agent_created: true
 
 ```bash
 cd "C:/Users/cfl/workbuddy-ai/我的世界/numen-1.16.5"
-python ../.workbuddy-ai/tmp/port-sdk-task.py
+python ../tools/port-sdk-task.py
 JAVA_HOME=../.toolchain/jdk-17.0.20.1+1 ../.toolchain/gradle-7.6.4/bin/gradle :core:compileJava
 ```
 
@@ -65,10 +65,23 @@ JAVA_HOME=../.toolchain/jdk-17.0.20.1+1 ../.toolchain/gradle-7.6.4/bin/gradle :c
 ## 测试方案（按需选，写死在 MEMORY.md）
 
 1. **本机（默认）**：`.testserver/` Fabric 1.16.5 端口 **25565** + 本机客户端。
-   驱动 `_perm_live_common.py`，用例在 `.workbuddy-ai/tmp/`。
+   驱动 `tools/_perm_live_common.py`，**可复用**用例在 `tools/`，一次性在 `.workbuddy-ai/tmp/`。
    **有服务端控制台 stdin + MCP 端口 8766** → **凡要召唤/驱动同伴、要控制台、要受控地形、要测新 jar，只能用本机方案。**
 2. **NAS 192.168.1.149**：容器 `mc1165-test` 端口 **25586**。
    ⚠️ RCON 关、MCP 未发布、容器平时 down。只用于验证真实部署 / 跨机连接。
+
+## 脚本与 git 安全（R1–R6，详见 `numen-1.16.5/docs/GIT_SAFETY.md`）
+
+- **可复用脚本放 `tools/`（入库）；一次性的才留 `.workbuddy-ai/tmp/`**（判断标准：「三个月后还想照着再做一遍吗？」）。
+  搬运/重映射/分析、全套 e2e 验收、NAS 部署脚本都已在 `tools/`。
+- **NAS 口令不写死**：`tools/nas_creds.py` 三级回退读取 →
+  `NUMEN_NAS_*` 环境变量 → 本机私有 `ssh-run.py`（已 gitignore）→ 仓库根 `.nas-creds.env`。
+  新写 NAS 脚本一律 `HOST, USER, PWD = nas_creds.host_user_pwd()` / `nas_creds.sudo_prefix()`。
+- **碰很多文件前先快照**：`python tools/git-snapshot.py`（R1）。**一刀内编译一绿就提 `WIP:`**，收尾
+  `git reset --soft <刀起点>` 压成一个（R2）。改 `.gitignore` 后必须 `python tools/git-audit.py`（R3）。
+- `tools/git-audit.py` 把 `.class/.pyc/.pyo/__pycache__` 按可再生产物放行（否则一编译就误报 SUSPECT 拦住提交）。
+- 若在 `tmp/` 里跑遗留脚本：`tmp/_perm_live_common.py` 是**兼容垫片**，会自动载入 `tools/` 里的真身。
+
 
 ## 移植期高频坑（详见 PORTING.md，别重新踩）
 

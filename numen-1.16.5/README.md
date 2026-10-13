@@ -21,7 +21,7 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 > 连得上、没被踢，而且**收到了同伴的聊天**：客户端自己的日志里有
 > `[CHAT] Alice joined the game` 与 `[CHAT] <Alice> …`。服务端侧也没有任何自定义通道告警
 > （`NumenPanelServer` 发之前先问 `ServerPlayNetworking.canSend`，没有通道的客户端就不发）。
-> 所以「不需要客户端 mod」这条是**验过的**，不是推断。复现：`.workbuddy-ai/tmp/vanilla-client-e2e.py`。
+> 所以「不需要客户端 mod」这条是**验过的**，不是推断。复现：`tools/vanilla-client-e2e.py`。
 
 > 本仓是**非官方移植**。上游源码许可 LGPL-3.0-only。
 

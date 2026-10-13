@@ -93,7 +93,7 @@ program/ 22 文件 / 1730 行
 
 **范围**：§2 那张表全部（90 文件 / 8814 行）。含 2 处接缝（见下）。
 
-**机械部分**：`python .workbuddy-ai/tmp/port-sdk-task.py`（拷 + 改包名 + 改跨包 import，**1 秒重放**）。
+**机械部分**：`python tools/port-sdk-task.py`（拷 + 改包名 + 改跨包 import，**1 秒重放**）。
 该脚本实跑过两次：一次 60 文件（`core:compileJava` **只报 11 个错**，说明这条路通），
 一次 90 文件（§2 的数字就是这么来的）。脚本已按方案乙把 `program/` 服务端半边 + `platform/`
 + `event/` + `entity/` 补件 + `ToolContext` 都写进名单，**一条命令重放**。

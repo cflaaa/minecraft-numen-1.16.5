@@ -4,7 +4,7 @@
 > 之后的修改、更新、修 bug 同样要在实际测试完成后及时记录进来（2026-10-12 拍板）。
 > 分工：决策看 `DECISIONS.md`，技术细节与踩坑看 `PORTING.md`（引用 §号），执行计划看 `RESTORE_PLAN_V3.md`。
 
-**最后更新**：2026-10-13（保存方式整改 + 进度复点 + 问题清单）
+**最后更新**：2026-10-13（保存方式整改 + **可复用脚本入 `tools/` 入库** + 进度复点 + 问题清单）
 
 ---
 
@@ -16,6 +16,10 @@
 - **构建**：`:core:build` 绿（含 527 单测 0 失败）；发行 jar **961 类 = core 726 + pathing 235**
   （刀 5 删 NumenTools/Acts/CompanionNav 后由 968 降至此，属预期）；五件套嵌入
   （agent / ai / lua / slf4j-api 1.7.36 / log4j-slf4j-impl 2.8.1）。
+- **脚本入库（R4）**：可复用脚本已从被忽略的 `.workbuddy-ai/tmp/` 搬进 **`tools/` 入库**——
+  搬运/重映射/分析 9 个 + 环境 A/B e2e 验收 8 个 + NAS 部署 3 个 + `nas_creds.py`（凭据读取器）。
+  **NAS 口令不再写死**（`nas_creds` 三级回退：`NUMEN_NAS_*` → 本机私有 `ssh-run.py` → `.nas-creds.env`）。
+  提交 `d6abbdb`；细则见 `GIT_SAFETY.md` R4。
 - **下一步**：刀 5 收尾（改造已真机验收：11 个世界工具逐一真机直调，**8 个直接通过**，3 个是验收脚本断言写错）；
   剩 1 个真问题（`mine` 生存模式渐进挖掘的服务端进度判定）+ 11 处「合并 jar 有、服务端 jar 没有」待逐条判可达性。
   详见 `UPSTREAM_COMPARISON.md` §4.4。
@@ -97,7 +101,7 @@
 ## 四、真机验收台账（测过什么）
 
 **环境A**（默认）：本机 `.testserver/` Fabric 1.16.5 端口 **25565** + 本机客户端 + MCP 端口 8766
-（服务端控制台 stdin 可用）；驱动 `_perm_live_common.py`；用例脚本在 `.workbuddy-ai/tmp/`。
+（服务端控制台 stdin 可用）；驱动 `tools/_perm_live_common.py`；**可复用**用例在 `tools/`，一次性在 `.workbuddy-ai/tmp/`。
 **环境B**（真实部署）：NAS `192.168.1.149` 容器 `mc1165-test` 端口 **25586**（online-mode=false）；
 部署 `deploy-knife4-nas.py`（SSH 传 jar → restart → 验日志），跨机客户端 `vanilla-nas-e2e.py`。
 

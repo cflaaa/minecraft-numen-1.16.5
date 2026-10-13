@@ -37,9 +37,9 @@ Numen 模组 **1.20.1 → 1.16.5 Fabric** 移植。仓库 `numen-1.16.5/`，上�
 - 离线多人修复、G 面板自绘（`-Dnumen.panel=` + `verify-panel.py`）、默认预设 NVIDIA NIM、`ModelCatalog`。
 
 ## 测试（两方案，按需选）
-1. **本机（默认，绝大多数情况）**：`.testserver/` Fabric 1.16.5 端口 **25565** + 本机客户端；**服务端控制台 stdin 可用**、**MCP 端口 8766** 可直连。驱动 `_perm_live_common.py`，用例在 `.workbuddy-ai/tmp/`（`perm-e2e.py`/`nav-gate-e2e.py`/`mod-load-check.py`/`vanilla-client-e2e.py`）。
+1. **本机（默认，绝大多数情况）**：`.testserver/` Fabric 1.16.5 端口 **25565** + 本机客户端；**服务端控制台 stdin 可用**、**MCP 端口 8766** 可直连。驱动 `tools/_perm_live_common.py`，**可复用**用例在 `tools/`（`perm-e2e.py`/`nav-gate-e2e.py`/`mod-load-check.py`/`vanilla-client-e2e.py`），一次性用例在 `.workbuddy-ai/tmp/`。
    → **凡要召唤/驱动同伴、要控制台、要受控地形、要测新 jar，只能用本机方案。**
-2. **NAS 192.168.1.149**：容器 `mc1165-test` 端口 **25586**，online-mode=false，数据 `/vol1/1000/docker/mc1165-test/data`。部署 `ssh-run.py` + `tmp/deploy-mc.py`。
+2. **NAS 192.168.1.149**：容器 `mc1165-test` 端口 **25586**，online-mode=false，数据 `/vol1/1000/docker/mc1165-test/data`。部署 `ssh-run.py` + `tools/deploy-mc.py`（NAS 口令改由 `tools/nas_creds.py` 读，不再写死；亦可设 `NUMEN_NAS_*` 环境变量）。
    ⚠️ **RCON 关着、MCP 端口没发布、容器平时是 down 的**（先 `cd 该目录 && sudo docker compose up -d`）。镜像必须 `docker.m.daocloud.io`（`docker.mslmc.cn` 不代理 itzg）。
    → 只用于验证真实部署 / 跨机连接。
 

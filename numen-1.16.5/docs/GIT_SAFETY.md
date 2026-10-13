@@ -40,6 +40,7 @@
 2. **加通配 ignore 规则前从不体检**：没人问过"源码树里有没有叫 `build` 的目录"。
 3. **可复用脚本长期躺在 `.workbuddy-ai/tmp/`**（被忽略）：搬运脚本 `port-knife4.py`、重映射 `k5remap.py`、
    全套 e2e 验收脚本——这些是"怎么把这事再做一遍"的知识，却不在版本库里（只有快照覆盖）。
+   **→ 2026-10-13 已按 R4 搬迁到 `tools/` 入库（含 NAS 部署脚本，口令改走 `tools/nas_creds.py`）。**
 4. **没有"动手前先快照"的习惯**。事故发生时手上有一堆未提交改动，没有任何一份可用备份。
 
 ## 四、新的保存规矩（写死，按这个做）
@@ -111,5 +112,6 @@ python tools/git-audit.py  # 有没有「该入库却被忽略」的隐患
 | 一键快照 | `tools/git-snapshot.py` | 历史 + 工作树原样备份到仓库外，自动轮换 |
 | 提交前钩子 | `tools/install-hooks.py` → `.git/hooks/pre-commit` | SUSPECT 直接拦住提交 |
 | 一次一刀 | 变更规则 | 一刀内可多次 `WIP:` + 收尾 `reset --soft` 压成一个（本仓规矩） |
+| 可复用脚本入库 | `tools/`（搬运 / e2e / 分析 / NAS 部署） | 从被忽略的 `tmp/` 搬出（R4）；NAS 口令改由 `tools/nas_creds.py` 读，不再写死 |
 
 > ⚠️ 钩子装在新 clone / 新机器上要重跑：`python tools/install-hooks.py`

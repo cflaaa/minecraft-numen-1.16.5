@@ -36,8 +36,10 @@ def git(*args):
 
 
 def classify(path):
-    if path.endswith(".class"):
+    if path.endswith((".class", ".pyc", ".pyo")):
         return "ok"
+    if "__pycache__/" in path:
+        return "ok"      # Python 字节码缓存：可再生产物，忽略是有意的
     if path.startswith(HEAVY):
         return "ok"
     if path.startswith(ALLOW):

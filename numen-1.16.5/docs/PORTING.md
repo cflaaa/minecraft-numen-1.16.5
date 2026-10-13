@@ -1698,7 +1698,7 @@ default boolean isUnobstructed(BlockState state, BlockPos pos, CollisionContext 
 会用 `spec.edit().changes(true)`（许挖许放）**再搜一次**——那一次才逐格问 GateTerrain。
 诊断只报不执行（`Navigation.tick` 里 `diagnosis.poll()` 的结论只变成 `NavStatus.failed`），世界不会被改。
 
-据此设计真机验证（`.workbuddy-ai/tmp/nav-gate-e2e.py`）：把她 tp 进一个**密闭**石头小室，目标埋在她
+据此设计真机验证（`tools/nav-gate-e2e.py`）：把她 tp 进一个**密闭**石头小室，目标埋在她
 脚下的石头里，制造「不改地形就到不了」的局面：
 
 | 步 | 条件 | 期望 | 实测 |
