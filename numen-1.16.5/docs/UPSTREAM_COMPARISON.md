@@ -281,16 +281,42 @@
    equip 回 `no diamond_helmet`、eat 回 `already full` 是上游正确报错，不是断言失败）。
    **`mine` 生存模式挖不动已修**（PORTING §19：`handleBlockBreakAction` 第 4 参误传 0，应为
    `body.getServer().getMaxBuildHeight()`）；真机 `accept5` 5-10 ✅ `{"dug":1,"left":0}`。
-2. **「合并 jar 有、服务端 jar 没有」仍剩 11 处**（`server-api-check.py` 复跑，已修掉 3 处）：
-   `class_1548.method_6872`、`class_1675.method_18075`、`class_1690.method_7535`、`class_1856.method_8105`、
-   `class_2248.method_9518/9574`、`class_2348.method_10250`、`class_2378.iterator()`、
-   `class_2635.method_11388`、`class_2708.method_11737`、整类 `class_310`。
-   其中 `class_2378.iterator()` 是**误报**（Iterable 继承，脚本父类链解析的限制）；
-   `class_310` 是客户端 Minecraft 类。其余需逐条判可达性——真机 8/11 通过说明常用路径不碰它们，
-   但换路径（掉落追踪、方块拾取、实体显示名）就可能踩到。
-2. **`scan_blocks` 语义变更**：原「扫全方块统计数量」→ `numen.scan.map`（地形俯视图）；按 id 找矿改用 Lua `numen.scan.blocks`。
-3. **21 个反编译恢复的文件无注释**（`core.build`、`core.task.build`，见提交 `32c2280`）——逻辑与刀 4 一致，可读性差，待补注释。
-4. `server-api-check.py` 报 12 处「专用服务端可能炸」，疑似把客户端包类引用误计入（输出自相矛盾），**未细查**。
-5. jar 类数基线 968 → **962**（刀 5 删 NumenTools/Acts/CompanionNav 后 961，core 727 是事故反编译恢复后的实际值；
+2. **「合并 jar 有、服务端运行 jar 没有」11 处 —— 已逐条 javap 核（2026-10-13）**：
+   用**编译用的 named 合并 jar** vs **运行时服务端 intermediary jar**（`.testserver/.fabric/remappedJars/…/server-intermediary.jar`）
+   逐类 javap 比对。**关键结论：真机 8/11 通过并不代表这些安全**——它们全在 11 个世界工具**没覆盖**的路径上
+   （近战、远程瞄准、合成、建造细节、换维度、回传给同伴的聊天）。逐条判定：
+
+   **❌ 真·潜伏崩溃（编译有、服务端运行 jar 无，路径可达）：**
+
+   | intermediary | named | 调用点 | 触发路径 |
+   |---|---|---|---|
+   | `class_2708.method_11737 ()I` | `ClientboundPlayerPositionPacket.getId()` | `FakeClient.onOutbound:86` | 换维度传送握手回执——`awaitingTeleport` 靠它取编号 |
+   | `class_2635.method_11388 ()Component` | `ClientboundChatPacket.getMessage()` | `FakeClient.onOutbound:90` | 服务端回传给同伴的话：死亡广播、指令回执、主人对同伴说话、动作栏 |
+   | `class_1548.method_6872` | `Creeper.getSwellDir()/isIgnited()` | `Menace.fusing():107` | 同伴靠近爬行者做危险评估时 |
+   | `class_1675.method_18075` | `ProjectileUtil.getEntityHitResult(...)` | `Ballistics:301`（`Crosshair:52` 注释已警告「客户端才有」） | 远程瞄准/弹道 |
+   | `class_1856.method_8105 ()[ItemStack` | `Ingredient.getItems()` | `CraftOps:263/315`、`RecipeBook:99`、`RecipeProbe:50` | 合成配方探测 |
+   | `class_2248.method_9574` | `Block.getCloneItemStack(BlockGetter,BlockPos,BlockState)ItemStack` | `BuildStates:130` | 建造规划取「这一格会变成什么物品」（方块拾取） |
+   | `class_2348.method_10250 (ResourceLocation)Z` | `Registry.containsKey(ResourceLocation)` | `Builtin:195`、`Target:45` | Lua 内建/目标解析查注册表键 |
+
+   **⚠️ 误报 / 非问题：**
+   - `class_2378.iterator()`：**误报**。`class_2378`(Registry) implements `class_2359<T> extends java.lang.Iterable<T>`，
+     `iterator()` 由 `Iterable` 继承，服务端运行 jar 照样有（脚本父类链解析的限制）。
+   - 整类 `class_310`（客户端 `Minecraft`）：**非问题**。只在 `core/client/*`（客户端专属层，由 `fabric.mod.json`
+     client 入口加载）里引用；`server-api-check.py` 自己也报 `[OK] 没有任何共享类引用 net.minecraft.client.*`。
+   - `class_1690.method_7535 (ZZZZ)V`（`Boat.controlBoat`，经 `BoatAccessor` `@Invoker`）：**待现场确认**。
+     它是 **required** `@Invoker`，但服务端**启动与 8/11 全程无 mixin 报错**——说明它已在服务端解析成功
+     （要么服务端运行 jar 有该方法、要么 `BoatAccessor` 只在客户端 mixin 组）。仅在「同伴坐船驾驶」路径现场验。
+   - `class_2248.method_9518 ()MutableComponent`：**调用点未确认**。该描述符不匹配 build 代码里明显的
+     `getName()`(返 `Component`)/`getDescriptionId()`(返 `String`)，需 javap `-c` 反查字节码定位是哪个源调用。
+
+   **修法（与 `76c2f24` 三处同一套路）**：每条在真机运行 jar 上 javap 核一个 1.16.5 等价写法——
+   包没有的服务端成员走 `@Accessor` mixin 取私有字段（`getMessage`/`getId` 这类），或换 1.16.5 有的入口
+   （`getSwellDir` → 读 `EntityData`，`getEntityHitResult` → `inputDDA`/手写射线，`getItems` → `Ingredient.values()`，
+   `containsKey` → `registry.get(id)!=null`，`getCloneItemStack` → `block.asItem()`）。属**潜伏**，不挡当前提交，
+   逐条修、每条真机验（因为只在专用服务端复现）。
+3. **`scan_blocks` 语义变更**：原「扫全方块统计数量」→ `numen.scan.map`（地形俯视图）；按 id 找矿改用 Lua `numen.scan.blocks`。
+4. **21 个反编译恢复的文件无注释**（`core.build`、`core.task.build`，见提交 `32c2280`）——逻辑与刀 4 一致，可读性差，待补注释。
+5. `server-api-check.py` 报 12 处「专用服务端可能炸」，疑似把客户端包类引用误计入（输出自相矛盾），**未细查**。
+6. jar 类数基线 968 → **962**（刀 5 删 NumenTools/Acts/CompanionNav 后 961，core 727 是事故反编译恢复后的实际值；
    pathing 235 未丢）。
-6. **刀 5 的 9 条改动已落 WIP**，按 D-10 R2 需在验收后 `reset --soft` 压成一个正式刀提交。
+7. **刀 5 的 9 条改动已落 WIP**，按 D-10 R2 需在验收后 `reset --soft` 压成一个正式刀提交。
