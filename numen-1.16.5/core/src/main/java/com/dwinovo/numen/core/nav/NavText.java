@@ -30,6 +30,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import com.dwinovo.numen.core.mc.PosShort;
 
 /**
  * 寻路交出来的事实怎么对模型说,全在这里,只此一处:结局({@link Outcome})说成一句英文、归到哪一种 {@link FailureType};
@@ -161,7 +162,7 @@ public final class NavText {
     }
 
     private static String where(BlockPos from, BlockPos toward) {
-        return String.format("from %s toward %s, about %.0f blocks away", from.toShortString(), toward.toShortString(),
+        return String.format("from %s toward %s, about %.0f blocks away", PosShort.of(from), PosShort.of(toward),
                 Math.sqrt(from.distSqr(toward)));
     }
 

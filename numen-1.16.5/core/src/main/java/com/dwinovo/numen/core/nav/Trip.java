@@ -21,6 +21,7 @@ import com.dwinovo.numen.core.permission.ConsentItem;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Item;
+import com.dwinovo.numen.core.mc.PosShort;
 
 /**
  * 执行:同伴的一趟路,从这里走到一个目标,经寻路的门面({@link Navigator#drive})完成,路上边走边细算。规划是另一件事
@@ -194,7 +195,7 @@ public final class Trip {
             consent = covered(unasked.item(), rest);
             phase = Phase.CONSENT;
             com.dwinovo.numen.core.Constants.LOG.info("[numen-task] 走到 {} 要问主人({}),停下等答复",
-                    denied.cell().toShortString(), unasked.verdict().reason());
+                    PosShort.of(denied.cell()), unasked.verdict().reason());
             return;
         }
         retire();

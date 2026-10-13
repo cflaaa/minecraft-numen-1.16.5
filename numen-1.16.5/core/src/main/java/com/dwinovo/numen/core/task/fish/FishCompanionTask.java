@@ -28,6 +28,7 @@ import net.minecraft.world.phys.Vec3;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import com.dwinovo.numen.core.mc.PosShort;
 
 /**
  * {@code numen.work.fish}:站在原地用钓竿抛一竿——对准、抛竿、等咬钩、收线,钓上来就收工,回执说钓上来的是什么。它不走动:站的地方
@@ -136,7 +137,7 @@ public final class FishCompanionTask extends AbstractCompanionTask<FishTaskRecor
             stance = current;
         }
         if (!current.equals(stance) || !isDryStance(current)) {
-            fail("I was moved off the spot I fished from (" + stance.toShortString() + "), and fishing does not "
+            fail("I was moved off the spot I fished from (" + PosShort.of(stance) + "), and fishing does not "
                     + "walk me back", FailureType.OUT_OF_REACH);
             return TaskState.FAILED;
         }
@@ -168,7 +169,7 @@ public final class FishCompanionTask extends AbstractCompanionTask<FishTaskRecor
             return failedCast("the fishing rod did not cast");
         }
         Constants.LOG.debug("[numen-fish] cast target={} pitch={}",
-                target.toShortString(), String.format(java.util.Locale.ROOT, "%.1f", pitch));
+                PosShort.of(target), String.format(java.util.Locale.ROOT, "%.1f", pitch));
         phase = Phase.WAIT;
         phaseTicks = 0;
         return TaskState.RUNNING;
@@ -206,7 +207,7 @@ public final class FishCompanionTask extends AbstractCompanionTask<FishTaskRecor
         boolean inWater = hook.level.getFluidState(hook.blockPosition()).is(FluidTags.WATER);
         if (!inWater && phaseTicks >= CAST_SETTLE_TIMEOUT) {
             Constants.LOG.debug("[numen-fish] miss hook={} on_ground={} age={}",
-                    hook.blockPosition().toShortString(), hook.isOnGround(), phaseTicks);
+                    PosShort.of(hook.blockPosition()), hook.isOnGround(), phaseTicks);
             return failedCast("the fishing hook did not settle in water");
         }
         if (phaseTicks >= CAST_LIFETIME) {

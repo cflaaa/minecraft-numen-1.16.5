@@ -6,7 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundPickItemPacket;
 import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
-import net.minecraft.network.protocol.game.ServerboundSetCarriedItemPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
@@ -135,7 +134,10 @@ public final class Hotbar {
     }
 
     private static BodyAction select(ServerPlayer body, int slot, Item item) {
-        body.connection.handleSetCarriedItem(new ServerboundSetCarriedItemPacket(slot));
+        // ⚠️ 不能用 new ServerboundSetCarriedItemPacket(slot)：那个构造器只在「合并的客户端+服务端 jar」里，
+        // 专用服务端 jar 经 ProGuard 裁剪后没有它（该包只由客户端构造发送），调了就是 NoSuchMethodError。
+        // 本仓的口径（见 conjure 与 Wardrobe）是直接置位——服务端逻辑读的就是这一格。
+        body.inventory.selected = slot;
         return new BodyAction.Held(item, slot, slot);
     }
 

@@ -182,9 +182,16 @@ public final class PlayerHands implements Effector {
         progress = 0;
     }
 
-    /** 这一个动作经服务端收包的入口送进去。1.16.5 的包没有「序列号」那一个参数。 */
+    /**
+     * 这一个动作经服务端收包的入口送进去。
+     *
+     * <p>⚠️ 不 new {@code ServerboundPlayerActionPacket(action, pos, face)}：那个构造器只在 **Loom 编译用的
+     * 「客户端+服务端」合并 jar** 里，**专用服务端 jar 经 ProGuard 裁剪后没有它**（该包只由客户端构造发送）——
+     * 照它写就是「编译过、一跑就 NoSuchMethodError」（本项目已栽过多次同一类坑）。
+     * 改为直接调 {@code handleBlockBreakAction}：服务端收到包时走的就是它，行为一致。
+     */
     private void send(ServerboundPlayerActionPacket.Action action, BlockPos pos, Direction face) {
-        body.connection.handlePlayerAction(new ServerboundPlayerActionPacket(action, pos, face));
+        body.gameMode.handleBlockBreakAction(pos, action, face, 0);
     }
 
     // ==================== 右键 ====================

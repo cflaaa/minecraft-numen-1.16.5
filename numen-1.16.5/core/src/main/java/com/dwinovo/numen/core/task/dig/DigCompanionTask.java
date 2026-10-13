@@ -152,10 +152,15 @@ public final class DigCompanionTask extends AbstractCompanionTask<DigTaskRecord>
         return null;
     }
 
+    /** 坐标的一句话（1.16.5 的 BlockPos 没有 toShortString，服务端 jar 里也没有）。 */
+    private static String digLabel(net.minecraft.core.BlockPos p) {
+        return p.getX() + "," + p.getY() + "," + p.getZ();
+    }
+
     @Override
     protected void onStart() {
         com.dwinovo.numen.core.Constants.LOG.info("[numen-task] dig start targets={} count={} what={} feet={}",
-                r.label, r.count, r.what, player.blockPosition().toShortString());
+                r.label, r.count, r.what, digLabel(player.blockPosition()));
         drops = Drops.open(player);
     }
 

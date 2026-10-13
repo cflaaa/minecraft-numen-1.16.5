@@ -20,6 +20,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import com.dwinovo.numen.core.mc.PosShort;
 
 /* ────────────────────────────────────────────────────────────────────────────
  * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
@@ -96,9 +97,9 @@ final class BuildOutstanding {
         for (Cell cell : this.cells) {
             byLayer.merge(cell.target().pos().getY(), 1, Integer::sum);
         }
-        Constants.LOG.info("[numen-build] \u6536\u4e0d\u4e86\u5c3e {}/{} feet={} \u7f3a\u683c\u5206\u5c42={} {}", new Object[]{completed, total, feet.toShortString(), byLayer, this.describe(frame)});
+        Constants.LOG.info("[numen-build] \u6536\u4e0d\u4e86\u5c3e {}/{} feet={} \u7f3a\u683c\u5206\u5c42={} {}", new Object[]{completed, total, PosShort.of(feet), byLayer, this.describe(frame)});
         for (Cell cell : this.cells.subList(0, Math.min(12, this.cells.size()))) {
-            Constants.LOG.info("[numen-build] \u7f3a {} {} \u671f\u671b={} \u5b9e\u9645={}", new Object[]{cell.cause(), cell.target().pos().toShortString(), cell.target().desiredState(), cell.actual()});
+            Constants.LOG.info("[numen-build] \u7f3a {} {} \u671f\u671b={} \u5b9e\u9645={}", new Object[]{cell.cause(), PosShort.of(cell.target().pos()), cell.target().desiredState(), cell.actual()});
         }
     }
 
