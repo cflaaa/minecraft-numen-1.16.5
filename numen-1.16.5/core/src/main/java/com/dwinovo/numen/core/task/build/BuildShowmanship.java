@@ -19,6 +19,27 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 施工的演出:转头、蹲起、挥手、手到落点的粒子、落位声。只管"看起来像有人在干活",不碰任何施工判定与账目——删掉整个类,
+ * 房子照样盖得出来,只是看着像作弊。
+ *
+ * <h2>表演不改变世界</h2>
+ * 它手里只有身体的输入(转头、挥手、蹲)和一份只读的视图:没有挖掘器,没有导航,没有放置的入口,也不挪身体——她站在原地放
+ * 够得着的格,走到哪儿是脚本的事。
+ */
+
 final class BuildShowmanship {
     private static final int SWING_PERIOD_TICKS = 6;
     private static final int CONJURE_TRAIL_SAMPLES = 6;

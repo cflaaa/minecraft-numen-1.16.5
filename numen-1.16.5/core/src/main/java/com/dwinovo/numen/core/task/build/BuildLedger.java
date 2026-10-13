@@ -14,6 +14,24 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 材料账本:此刻还需要什么、背包还差什么、缺口怎么向玩家交代。
+ * 开工前置、中途报缺与收工回执共用同一个统计口径,所以玩家听到的永远
+ * 是同一个问题的答案——"从现在起还要凑什么"。
+ */
+
 final class BuildLedger {
     private static final int MISSING_ITEMS_LISTED = 8;
     private final NumenPlayer player;

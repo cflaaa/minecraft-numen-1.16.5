@@ -24,6 +24,30 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.saveddata.SavedData;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 建成的房子,跟着世界存档走(主世界的 SavedData,一份记全部维度):每一栋是某份设计或蓝图文件在某个维度、某个落点上
+ * 盖出来的那一次,记着她<b>实际放下的每一格</b>(格 → 方块)。
+ *
+ * <p>这份记录是"这栋房子由哪些格子组成"的唯一出处。再按同一份施工图在同一个落点 {@code build at},设计里已经没有、
+ * 记录里有、世界里现在仍是记录里那个方块的格子,就是该拆的——别人放的、主人后来自己摆的、被改动过的,不在记录里或
+ * 已对不上,一律不碰({@link Changes})。所以设计只存现状,不存版本。
+ *
+ * <p>记录随施工逐格写({@link #placed}、{@link #cleared}):放下一格记一格、拆掉一格划一格。活怎么收场、服务器停在哪一刻,
+ * 记下的都是世界里真发生的,不靠收工时补账。
+ */
+
 public final class Built
 extends SavedData {
     private static final String KEY = "numen_built";

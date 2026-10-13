@@ -11,6 +11,27 @@ import java.util.List;
 import java.util.Map;
 import net.minecraft.core.BlockPos;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 要盖成的样子({@code numen.build.place}、{@code numen.build.diff} 收的那一个参数):一串格(Cells,每一格是那一格要放的方块,照
+ * {@code /setblock} 的写法),或一份蓝图文件摆在哪儿({@code numen.build.blueprint} 交回的那张表:文件名、原点、转了多少度)。两样恰好
+ * 一样。蓝图只记在哪、怎么摆,格子留在文件里,用到时才读。
+ *
+ * @param cells     一串格;是蓝图时为 null
+ * @param blueprint 一份蓝图;是一串格时为 null
+ */
+
 public record Design(List<Cell> cells, Blueprint blueprint) {
     public static final Codec<Design> CODEC = new Codec<Design>(){
 

@@ -63,6 +63,40 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 多格建造任务:站在原地,把施工图里手够得着的格一批一批落进世界,每一格轮到一次就收场。
+ *
+ * <p><b>只放够得着的</b>——每一格够不够得着与 {@code numen.move.to(…, {arrive = "place"})} 走到的地方同一个判据({@link BuildSurvey}):
+ * 她不走动,够不着的格留给下一次,回执说还剩几格、最低最近的一格在哪。走到够得着的地方、挖开挡着的、再放,是脚本的事
+ * (库里的 {@code numen.build.raise})。受理之前看一眼:够得着的一格都没有就当场拒绝,说清该先去哪儿。
+ *
+ * <p><b>不挖</b>——生存模式下图纸要的格里立着别的方块,那一格由 {@code numen.work.dig} 挖开(挖的判据、工具、掉落、权限都是它的),
+ * 这里不碰,回执里算进"要先挖开的";创造模式照原版一下就碎:图纸直接写上去顶掉原来的。
+ *
+ * <p>保留下来的是施工自己的事:生存模式逐格扣料、期望状态精确落位、低层先放(支撑还没长出来的先放着,
+ * 留给下一次调用)、整份对上之后让世界落定一次、生成摆设。
+ *
+ * <p><b>施工与表演分开</b>——施工只管下一格放哪、放没放成、差什么;转头、挥手、粒子归演出组件 {@link BuildShowmanship},
+ * 它手里没有放置入口,改不了世界。
+ *
+ * <p><b>分工</b>——本类只持有施工的调度状态机(相位、遍、层窗口、落位循环)与轮扫对账;每一格的情形在 {@link BuildSurvey},
+ * 单格判据在 {@link BuildCellRules},背包口径在 {@link BuildInventory},材料账本在 {@link BuildLedger},摆设与善后在
+ * {@link BuildFixtures},演出在 {@link BuildShowmanship},顺序与节奏的纯函数在 {@link BuildOrder},收不了尾时的缺格清单在
+ * {@link BuildOutstanding}。
+ */
+
 public final class BuildCompanionTask
 extends AbstractCompanionTask<BuildTaskRecord> {
     private static final int PLACE_FLAGS = 11;

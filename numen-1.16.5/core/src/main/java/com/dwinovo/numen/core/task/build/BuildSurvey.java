@@ -23,6 +23,27 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.state.BlockState;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 一件施工的每一格,对她此刻站的地方而言是什么情形:已经对上、不去动、得先挖开、还立不住、够得着就放、够不着。{@code numen.build.place} 只放
+ * "够得着就放"的那些、受理前问还有没有,{@code numen.build.diff} 把整份照这同一个判据数给脚本——施工与查询读的是同一份。
+ *
+ * <p>"够得着"就是 {@code numen.move.to(…, {arrive = "place"})} 走到的地方({@link Destination#reach}):走到了,这一格就在这里算够得着。
+ * 生存模式下图纸要的格里立着别的东西,得先由 {@code numen.work.dig} 挖开,{@code numen.build.place} 不挖;创造模式照原版一下就碎,放的时候
+ * 直接顶掉。立着东西、身上却没有要放的料的格不叫她挖:没料挖了只是在主人的地上挖个坑。
+ */
+
 public final class BuildSurvey {
     private final NumenPlayer player;
     private final BuildTaskRecord r;

@@ -21,6 +21,26 @@ import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 收不了尾时还缺的格:走一遍够得着却放不下的格,每一格归到一个病因下,得到一份清单。留案的日志、交给模型的回执、失败的类型都从这一份出,
+ * 不各数各的。
+ *
+ * <p>剩下的格放不下去只有三种病因,修法各不相同:让占着的人挪开、认下图纸里原版不允许的那几格、找出是什么一再把它弄没。
+ * 所以按病因分开报,每一堆点名到方块和坐标——笼统一句 "could not be placed" 等于裁决做了却不交代理由。
+ */
+
 final class BuildOutstanding {
     private final List<Cell> cells;
     private final int damagedCells;

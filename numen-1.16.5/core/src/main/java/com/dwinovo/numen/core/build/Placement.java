@@ -8,6 +8,29 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.phys.Vec3;
 
+/* ────────────────────────────────────────────────────────────────────────────
+ * ⚠️ 本文件是 2026-10-13 **反编译恢复**的（提交 32c2280）。
+ *
+ * 原版源码曾被 .gitignore 的 `**/build/` 连坐忽略、**从未进过版本库**；工作树一次误删后，
+ * 从**已部署的 jar**（.testserver/mods/numen-0.1.4-1.16.5.jar，刀 4 构建）反编译救回：
+ * 抽 class → tiny-remapper(intermediary→named) → CFR → 文本重映射残留名。
+ * **逻辑与刀 4 完全一致，但原注释全部丢失**，且反编译产物带少量伪影（强转/泛型推断）。
+ *
+ * 下面这份类说明取自**上游 1.20.1 同名文件**的 javadoc，权作阅读路线图：
+ * 1.16.5 适配过的细节可能与它有出入，以代码为准。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 一份施工图摆到哪儿、朝哪儿:原点 {@code (0,0,0)} 落在 {@code anchor},整份绕原点顺时针(俯视)转 {@code quarters} 个
+ * 90°。设计与蓝图文件摆下去都经它——同一条变换,方块朝向跟着转。
+ *
+ * <p>为什么绕原点而不是"转完再把最小角对齐到锚点":设计改了会变大变小,最小角跟着挪;同一栋房子按同一个落点再摆一次,
+ * 原来的墙必须落回原来的格子,差异才算得对。绕原点转,原点永远在锚点上。
+ *
+ * <p>位置与方向都由原版算({@link StructureTemplate#transform}、{@link BlockState#rotate}):楼梯朝向、门的合页转过去
+ * 该是什么样,是原版自己的规则。
+ */
+
 public record Placement(BlockPos anchor, int quarters) {
     public static final Placement IN_PLACE = new Placement(BlockPos.ZERO, 0);
 
