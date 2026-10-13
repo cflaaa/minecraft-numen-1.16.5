@@ -39,7 +39,7 @@ import java.util.function.Consumer;
  * <pre>
  *   主人的话 ──push──▶ EventQueue ──▶ AgentLoop ──turnRequest──▶ ModelPort ──▶ NumenLlmClient
  *                                       │                                        │
- *                                       └──run──▶ ToolPort ──▶ NumenTools ──▶ 身体
+ *                                       └──run──▶ ToolPort ──▶ WorldTools ──▶ 身体
  * </pre>
  *
  * <h2>线程</h2>
@@ -113,9 +113,8 @@ public final class CompanionBrain {
 
     /** 服务端每刻调一次。 */
     public void tick() {
-        // 先推进跨刻的长动作（走路），再让引擎往前走一步——
-        // 顺序反了的话，「动作刚做完」这件事要等下一刻才被引擎看见。
-        NumenTools.tick(body);
+        // 跨刻的长动作（走路、挖矿…）由 CompanionTickDispatcher 推进（见 NumenCoreFabric 的
+        // START_SERVER_TICK）；这里只让引擎往前走一步。
         // 驾驶席翻转成外接的那一下作废在飞的回合：接管之后内脑的回复不该再派工具。
         // 交还不用做什么——停牌是现算的（见 HostPortImpl#externallyDriven），内核下一次推进自己看得见。
         boolean driving = McpMode.instance().driving();
@@ -379,7 +378,7 @@ public final class CompanionBrain {
     }
 
     /** 给工具用的：同伴说一句话（与 {@link #say} 同一出口，便于将来改成气泡/语音）。 */
-    void speak(String text) {
+    public void speak(String text) {
         say(text);
     }
 

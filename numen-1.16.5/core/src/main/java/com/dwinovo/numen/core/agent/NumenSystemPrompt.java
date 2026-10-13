@@ -7,7 +7,8 @@ package com.dwinovo.numen.core.agent;
  * {@code ENTITY_PROMPT}、{@code SPEAKING} 等一大票常量，拼成给模型的完整人设与规矩。
  * 这里先做最小可用的一版：人设 + 这个世界里必须知道的三条硬事实。
  *
- * <p>与上游的差别只在<b>工具集</b>——这一版的工具少得多（见 {@link NumenTools}），
+ * <p>与上游的差别只在<b>工具集</b>——这一版的工具少得多
+ * （见 {@link com.dwinovo.numen.core.agent.tool.WorldTools}），
  * 提示里就不能提那些还没有的能力，否则模型会一本正经地调用不存在的工具。
  */
 final class NumenSystemPrompt {

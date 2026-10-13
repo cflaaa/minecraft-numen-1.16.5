@@ -313,7 +313,7 @@ public final class Companions {
         }
         CompanionEvents.fire(CompanionEvent.DEATH, body);   // 不发工具结果：那条 tool_call 已由死因结算
         // 共存期：旧大脑（本仓自写子集）也停掉——它由 Companions.tick 驱着，不停会继续
-        // 拿一具即将离场的身体跑工具。刀 3 删 Acts/NumenTools 时这一并去掉。
+        // 拿一具即将离场的身体跑工具。（刀 5 已删 Acts/NumenTools；这条留着待旧大脑一并收掉。）
         CompanionBrain oldBrain = BRAINS.get(uuid);
         if (oldBrain != null) {
             oldBrain.halt("身体死亡");

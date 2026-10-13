@@ -14,7 +14,6 @@ import com.dwinovo.numen.agent.tool.ToolCall;
 import com.dwinovo.numen.agent.tool.ToolRegistry;
 import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.CompanionBrain;
-import com.dwinovo.numen.core.agent.NumenTools;
 import com.dwinovo.numen.core.entity.Companions;
 import com.dwinovo.numen.core.entity.NumenPlayer;
 import com.dwinovo.numen.core.program.CallObserver;
@@ -87,9 +86,9 @@ public final class ToolRunner {
         ToolRegistry.register(new TodoTool());
         ToolRegistry.register(new MemoryTool());
         int brains = ToolRegistry.size();
-        // 本仓的世界工具：旧 Spec 逐个包成 NumenTool（名字/说明/参数schema 照旧，执行走旧 Job）
-        for (IToolSpec spec : NumenTools.specs()) {
-            ToolRegistry.register(new WorldTool(spec));
+        // 本仓的世界工具：名字/说明/参数 schema 照旧（MCP 契约），执行由 WorldTools 翻成上游 @Fn 调用
+        for (NumenTool tool : WorldTools.asNumenTools()) {
+            ToolRegistry.register(tool);
         }
         Constants.info("登记 {} 个工具：{} 个大脑工具 + {} 个世界工具",
                 ToolRegistry.size(), brains, ToolRegistry.size() - brains);
@@ -168,7 +167,7 @@ public final class ToolRunner {
             call.complete(ToolOutcome.failure("这只同伴没有登记的大脑"));
             return;
         }
-        NumenTools.runSingle(body, brain,
+        WorldTools.run(body, brain,
                 new LlmToolCall(call.id(), call.toolName(), call.rawArgs()), call::complete);
     }
 

@@ -4,7 +4,7 @@ import com.dwinovo.numen.agent.llm.ToolOutcome;
 import com.dwinovo.numen.agent.provider.LlmToolCall;
 import com.dwinovo.numen.core.Constants;
 import com.dwinovo.numen.core.agent.CompanionBrain;
-import com.dwinovo.numen.core.agent.NumenTools;
+import com.dwinovo.numen.core.agent.tool.WorldTools;
 import com.dwinovo.numen.core.command.NumenCommand;
 import com.dwinovo.numen.core.entity.Companions;
 import com.dwinovo.numen.core.entity.NumenPlayer;
@@ -33,7 +33,7 @@ import java.util.function.Function;
  *   <li><b>大脑层</b>——{@link McpMode#driving()} 为真时内置大脑一轮都不开
  *       （内核每步现问 {@code HostPort.externallyDriven()}，在别人手里时停牌 {@code EXTERNAL}）。
  *       主人在游戏里说的话照样进收件箱，由外脑经 {@link #takeEvents} 取走、用 {@link #say} 回话；</li>
- *   <li><b>身体层</b>——一具身体同时只有一件长动作：{@code NumenTools} 的任务槽
+ *   <li><b>身体层</b>——一具身体同时只有一件长动作：{@link WorldTools} 背后的上游任务槽
  *       与内核的 {@code runAside} 都会拒绝第二件活。</li>
  * </ul>
  *
@@ -224,7 +224,7 @@ public final class McpActuator {
 
     /**
      * 替 {@code companion} 跑一个工具——<b>和内置大脑用的是同一套工具</b>
-     * （目录见 {@link NumenTools#specs()}），只是不过模型。
+     * （目录见 {@link WorldTools#specs()}），只是不过模型。
      *
      * <p>走的是同伴自己的工具口（{@code AgentLoop#runAside}）：一件长动作做完才回执，
      * 被急件停在调用之间，跑完把工具结果带回来。身体忙的时候收不下去，回一条带话术的失败。
@@ -232,7 +232,7 @@ public final class McpActuator {
      * <p>不需要先取得控制权：内置大脑要么被「外接大脑」模式整体挂起，
      * 要么和这次调用一起受「一具身体一件活」约束。
      *
-     * @param toolName 已注册的工具名（大小写宽容，见 {@link NumenTools#resolve}）
+     * @param toolName 已注册的工具名（大小写宽容，见 {@link WorldTools#resolve}）
      * @param argsJson 工具参数，JSON 对象文本；null/空 = {@code {}}
      * @return 工具结果的 {@code ToolOutcome} JSON 文本；失败也是这个形状，不会是异常的 future
      */
