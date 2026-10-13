@@ -31,22 +31,26 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 
 | 部分 | 状态 |
 |---|---|
-| 引擎层 `lua/` `agent/` `ai/`（124 主源码 + 43 测试） | ✅ **逐字照搬上游**，编译通过，单元测试全绿 |
-| `core/` Minecraft 适配层（57 主源码 / 10467 行） | ✅ 已编译；**真机跑通**（专用服务端 + 真实 1.16.5 客户端） |
-| 寻路 `pathing/`（117 文件 / 13316 行） | ✅ 已搬（A* + 手搬的 DDA 视线），真机验证能绕障走通 |
+| 引擎层 `lua/` `agent/` `ai/`（142 主源码 / 32,144 行） | ✅ **逐字照搬上游**，编译通过，单元测试全绿 |
+| 寻路 `pathing/`（117 文件 / 13,329 行） | ✅ 已搬并适配（A* + 地形分析 + 手搬 DDA 视线），真机验证能绕障走通 |
+| `core/` Minecraft 适配层（384 主源码 / 51,136 行） | ✅ 已编译；**真机跑通**（专用服务端 + 真实 1.16.5 客户端） |
 | 行为许可层 `permission/`（17 文件） | ✅ 已搬：`Gate`（主人三层 + 出厂表）、`Rule` 解析器、`PlacedBlocks` 账本、`ConsentDesk` 征询，外加 `/numen permission` 与 `/numen consent` 命令树 |
 | 权限闸接线 | ✅ `mine` / `use_block` / `drop` 过闸（ASK 时把这次调用**停在原地**发征询，答复后带回同一次调用重跑）；Lua 的 `numen.inv.drop` / `numen.use.block` 同步过闸；寻路那条路由 `GateTerrain` 逐格裁决 |
 | 外接大脑（MCP） | ✅ `core/mcp/`：JDK `HttpServer` 上手写的 MCP 服务端（JSON-RPC 2.0），外部 agent 可全程驱动同伴；外脑驱动期间内置大脑停牌 |
-| 工具表 | ✅ 上游 `agent/tool` 全套照搬（ToolRegistry / ScriptTool / SkillTool / TodoTool / MemoryTool），core `ToolRunner` 统一派发：**15 工具**（4 大脑 + 11 世界），MCP `tools/list` **19 个** |
-| 客户端界面 | 🟡 G 面板（**G** 键）是**自绘**的，不是上游原版 UI |
-| 征询界面 | 🟡 聊天消息 + 可点击按钮（`RUN_COMMAND`）——这是 A 计划的**最终形态**，不是过渡（`network/` 不搬） |
-| 完整任务集（建造 / 战斗 / 钓鱼 / 开箱 / 合成… 13 族） | ❌ 未搬（刀 4） |
 | `sdk/`（`@Fn` API 框架） | ✅ 已搬（39/39 文件，与上游同名）；`@Fn` 三组（api/task/module）真机验通（help / status） |
-| 并发与每刻主线程预算 | ❌ 未做——`program/ProgramLimits` 不在 A 计划内，做多人服要另补这条闸 |
+| 完整任务集（建造 / 战斗 / 钓鱼 / 开箱 / 合成… 13 族） | ✅ **已搬（刀 4，`aff462f`）**：上游 `core/common` 主体整组归位，`Acts.java` 退役 |
+| 工具表 | ✅ 上游 `agent/tool` 全套照搬（ToolRegistry / ScriptTool / SkillTool / TodoTool / MemoryTool），core `ToolRunner` 统一派发：**15 工具**（4 大脑 + 11 世界），MCP `tools/list` **19 个** |
+| 世界工具驱动 | 🔵 **刀 5 进行中**：11 个世界工具正从自写 MCP-lua 驱动改成上游 `@Fn` 驱动（`a9a0116`）。真机 11/11 产品侧全过；**剩 7 处「专用服务端潜伏崩溃」待修**（换维度 / 回传聊天 / 爬行者 / 远程瞄准 / 合成 / 建造取物品 / Lua 查注册表，见 `docs/UPSTREAM_COMPARISON.md` §4.4） |
+| 客户端界面 | 🟡 G 面板（**G** 键）是**自绘**的，不是上游原版 UI |
+| 征询界面 | 🟡 聊天消息 + 可点击按钮（`RUN_COMMAND`）——原版客户端也能点，是 A 计划的**最终形态** |
+| 多人服每刻主线程预算 | ❌ 未做——`program/ProgramLimits` 不在 A 计划内，做多人服要另补这条闸 |
 
 **一句话**：引擎 + 适配层 + 寻路 + 权限层 + 工具统一派发（`ToolRunner`）都站在 1.16.5 上了，**真机跑得通**
-（专用服务端与真实客户端的端到端测试都验过，见 `docs/PORTING.md` §11 / §16 / §17）。离上游还差的是
-**任务框架与 13 族任务本体**（刀 4），以及客户端 UI 这处自绘简化版。**逐刀进度与验收台账见 `docs/STATUS.md`。**
+（专用服务端与真实客户端的端到端测试都验过，见 `docs/PORTING.md` §11 / §16 / §17）；
+**13 族任务本体也已归位（刀 4）**。当前在做**刀 5**：把 11 个世界工具从自写驱动换成上游 `@Fn` 驱动，
+真机 11/11 已过，剩 7 处「专用服务端才崩」的潜伏问题待修。
+再往后是**刀 6**（清理：导航壳 / G 面板 / MCP 版本漂移 / server-api-check / 文档）与
+`ui/`、`plugins/` 两个整缺口。**逐刀进度与验收台账见 `docs/STATUS.md`。**
 
 ---
 
@@ -55,17 +59,22 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 **已编译、已在真机跑通。** 本机（Windows + Temurin JDK 17）实测：
 
 ```
-./gradlew :core:build                    ✅ BUILD SUCCESSFUL
-  产出 core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar    (≈1.2 MB)
+# 在 numen-1.16.5/ 下跑；工具链在仓库根 .toolchain/，故用 ../ 前缀
+JAVA_HOME=../.toolchain/jdk-17.0.20.1+1 ../.toolchain/gradle-7.6.4/bin/gradle :core:build    ✅ BUILD SUCCESSFUL
+  产出 core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar    (≈2.6 MB)
   └─ META-INF/jars/  五件套嵌套 jar 已就位（agent + ai + lua + slf4j-api 1.7.36 + log4j-slf4j-impl 2.8.1）
-  └─ 平铺 620 个 class = pathing 235 + core 385
+  └─ 平铺 962 个 class = core 727 + pathing 235
+     ⚠️ 改完 pathing 必须 clean 重建并**逐个比对类名**：loom 0.12 跨项目共享 TinyRemapper 会丢 pathing 类，
+        已在 core + pathing 加 remapperIsolation.set(true) 压住（脚注见 docs/PORTING.md）
 
-./gradlew :lua:test :agent:test :ai:test :core:test    ✅ 全绿（最新基线见 docs/STATUS.md）
+JAVA_HOME=… gradle :core:test    ✅ 全绿（527 单测；最新基线见 docs/STATUS.md）
 ```
 
 真机验证（专用 Fabric 1.16.5 服务端 + 真实 1.16.5 客户端 + 外接大脑）跑通过：召唤同伴、
-寻路走过去、挖方块、放置账本生效、权限征询往返（放行 / 要问 / 记住 / 拒绝）、
-`GateTerrain` 拒绝挖石头。细节见 `docs/PORTING.md` §11 / §16 / §17。
+寻路走过去、挖方块（**生存模式渐进挖掘也已通**，`docs/PORTING.md` §19）、放置账本生效、
+权限征询往返（放行 / 要问 / 记住 / 拒绝）、`GateTerrain` 拒绝挖石头。
+另在 **NAS 容器真实部署 + 跨机纯原版客户端（环境 B）全过**。
+细节见 `docs/PORTING.md` §11 / §16 / §17 / §18 / §19。
 
 `maven.fabricmc.net` 这个 Cloudflare 域名**时通时不通**（第一次全超时，第二次通）。
 解法不是代理，是把**阿里云公共仓排到仓库列表最前面**——loom 那些量大的传递依赖
@@ -81,10 +90,15 @@ Numen 是一个**活在 Minecraft 里的 AI 同伴**：你召唤一个同伴（�
 
 ```bash
 cd numen-1.16.5
-./gradlew build        # → core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar
-./gradlew runClient    # 起 1.16.5 + Fabric 开发客户端
-./gradlew runServer
+# 工具链（JDK 17 + Gradle 7.6.4）在仓库根 .toolchain/，故用 ../ 前缀。
+# Java 17 + 官方 Mojang 映射，勿改 Yarn。
+JAVA_HOME=../.toolchain/jdk-17.0.20.1+1 ../.toolchain/gradle-7.6.4/bin/gradle :core:build   # → core/build/libs/Numen-fabric-1.16.5-0.1.4-1.16.5.jar
+JAVA_HOME=… gradle :core:test                                                                  # 527 单测
 ```
+
+日常验证不用 `runClient`/`runServer`：真机测试服在 `.testserver/`（已部署 Fabric + 本模组），
+可复用脚本在仓库根 **`tools/`**（e2e 验收 / NAS 部署 / 映射核对，已入库）。
+**动很多文件之前先跑 `python tools/git-snapshot.py`**，规矩见 `docs/GIT_SAFETY.md`。
 
 | 项 | 值 |
 |---|---|
@@ -178,42 +192,53 @@ Immediate reason: [HARD_DEP_NO_CANDIDATE numen ... {depends fabric-api @ [*]}]
 ```
 numen-1.16.5/
 ├── lua/        ← 逐字照搬：Lua 5.2 沙箱虚拟机（纯 JVM，50 文件）
-├── agent/      ← 逐字照搬：ReAct 循环内核 + 事件队列（纯 JVM，44 文件）
+├── agent/      ← 逐字照搬：ReAct 循环内核 + 事件队列 + 工具/技能表（纯 JVM，62 文件）
 ├── ai/         ← 逐字照搬：LLM 连接层，5 套协议（纯 JVM，30 文件）
 ├── pathing/    ← 照搬并适配：寻路（A* + 地形分析 + 视线），要对着 MC 编译（117 文件）
-├── core/       ← 新写：Minecraft 1.16.5 适配层（模组本体，57 文件）
+├── core/       ← Minecraft 1.16.5 适配层（模组本体，384 文件 / 51136 行）
 │   └── src/main/java/com/dwinovo/numen/core/
 │       ├── NumenCoreFabric.java    入口
 │       ├── entity/                 假玩家身体、工厂、花名册
+│       ├── act/                    挖掘/放置/使用执行器（BlockDigger / Interaction 等）
 │       ├── agent/                  大脑与工具表
-│       ├── nav/                    寻路接入（CompanionNav / CompanionPorts / GateTerrain）
+│       ├── nav/                    寻路接入（GateTerrain 逐格裁决；`CompanionNav` 已于刀 5 删除）
 │       ├── permission/             行为许可层（Gate / Rule / RuleSet / ConsentDesk / PlacedBlocks…，17 文件）
 │       ├── mcp/                    外接大脑（MCP 服务端 + 配置 + 驱动闸）
-│       ├── task/                   动作层（Acts 等，本仓自写的子集）
-│       ├── script/                 Lua 绑定
-│       ├── client/                 G 面板、离线账号修复
-│       ├── mixin/                  mixin（放置账本、离线账号；客户端那份在 mixin/client）
-│       ├── command/                /numen
-│       ├── config/                 config/numen.json
-│       └── data/ llm/ net/         词表子集 / LLM 门面 / 面板网络
+│       ├── task/                   13 任务族（上游 core/common 归位，刀 4）+ 公共框架
+│       │                             base/chain/build/combat/dig/fish/interact/inventory/
+│       │                             locate/move/reflex/survival/wait
+│       ├── program/ network/        程序管理与传输层（方案甲：22 + 33 全搬，接缝归零）
+│       ├── sdk/                    `@Fn` API 框架（照搬上游，39 文件）
+│       ├── scan/ route/ blueprint/ area/ init/  combat/  build/  tools/  gear/  platform/
+│       └── script/ client/ mixin/ command/ config/ event/ data/ api/ llm/ mc/ net/ work/
 └── docs/
-    ├── PORTING.md             ← 逐条核过的 1.20.1 → 1.16.5 API 差异表 + 各阶段实录
-    ├── RESTORE_PLAN.md        ← 归位计划：消除 4 处自写子集，分 6 阶段
-    ├── UPSTREAM_COMPARISON.md ← 与上游的结构差异对照
+    ├── STATUS.md             ← 状态台账（活文档）：逐刀进度 + 真机验收台账 + 基线
+    ├── DECISIONS.md          ← 决策台账：用户已拍板事项的唯一出处
+    ├── GIT_SAFETY.md         ← 保存规矩：快照 / WIP 提交 / 可见性审计（tools/ 三件套）
+    ├── PORTING.md            ← 逐条核过的 1.20.1 → 1.16.5 API 差异表 + 各阶段实录
+    ├── RESTORE_PLAN_V3.md    ← 归位计划（当前执行版；⚠️ 其中的「方案乙」已被证伪，实走方案甲）
+    ├── UPSTREAM_COMPARISON.md ← 与上游的结构差异对照 + 已知问题清单
+    ├── RESTORE_PLAN.md / _V2.md  ← 历史稿（v1 / v2，勿作执行依据）
     ├── PERMISSION-PLAYTEST.md ← 权限层的真机试跑清单
-    └── mm.py                  ← 查官方映射的小工具（本文所有 API 结论靠它核的）
+    └── mm.py                 ← 查官方映射的小工具（本文所有 API 结论靠它核的）
 ```
+
+> 仓库根还有 `tools/`（可复用脚本：e2e 验收、NAS 部署、映射核对、git 安全三件套）与
+> `ref/numen-1.20.1/`（上游源码克隆，仅作对照，不入库）。
 
 ---
 
 ## 想接着做
 
-看 `docs/RESTORE_PLAN.md`——归位计划的 6 个阶段，目标是把本仓 4 处自写子集
-（`Acts` / `NumenTools` / `CompanionScript` / `CompanionNav`·`CompanionPorts`）换回上游原版写法。
-**当前在阶段 1 的一半**：`permission/` 已落地，`sdk/` 未搬。
+先读 `docs/STATUS.md`（活台账）与 `docs/DECISIONS.md`（用户已拍板事项的唯一出处）。
+执行计划在 `docs/RESTORE_PLAN_V3.md`，但要留意：**其中的「方案乙」已被实测证伪，实际走「方案甲」**
+（`program/` 22 + `network/` 33 全搬，接缝归零），见 `DECISIONS.md` §四。
 
-按 A 计划，`program/`（客户端↔服务端传输层）、`network/`、客户端大脑**不在归位范围内**——
-它们不是欠账，是这套「大脑在服务端」的架构有意不要的一层。详见 `docs/PORTING.md` §17.7。
+**当前状态（2026-10-13）**：刀 1a ~ 4 已完成（框架归位 / 接线 / 穿脱 / 工具派发 / **13 任务族**）；
+**刀 5 进行中**——11 个世界工具改上游 `@Fn` 驱动，真机 11/11 已过，剩 **7 处「专用服务端才崩」的潜伏问题待修**
+（清单 + javap 判据 + 修法见 `UPSTREAM_COMPARISON.md` §4.4 条2）；
+再往后是**刀 6**（清理：导航壳 / G 面板 / MCP 版本漂移 / server-api-check / 文档）与
+`ui/`、`plugins/` 两个整缺口（Q-01 / Q-02，见 `UPSTREAM_COMPARISON.md` §4）。
 
 `docs/PORTING.md` 第二节那张表是接着做的人最该先读的东西：
 里面每一条都是「上游那样写、1.16.5 上编译不过」的坑，对着官方映射核过，不用再踩一遍。

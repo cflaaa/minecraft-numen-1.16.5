@@ -1,9 +1,18 @@
 # 归位计划 v3 —— 执行版（2026-10-11）
 
+> ## ⛔ 2026-10-11 晚：本文的「方案乙」已被实测证伪，实际走的是**方案甲**
+> 动手编译发现 `program/` 的**服务端半边紧耦合传输半边**（`ServerPrograms` 直接用 `ClientCalls` /
+> `ClientTransport` / `ModuleSet` / `NetworkTransport.INSTANCE` / `NumenNetwork`），而传输半边又依赖
+> `network/` 的 `Wire` / `ClientCallPayload`。按乙「只留 2 处接缝」**编不过**（实测 35 个错全出在这条链上）。
+> **用户拍板改走方案甲：`program/` 22 文件 + `network/` 33 文件全搬，接缝归零。**
+> 本批实际规模 **137 文件 / 13082 行**（乙估 90 / 8814）。
+> **权威记录见 [`DECISIONS.md`](./DECISIONS.md) §四。本文自此仅作历史过程稿——
+> 下面的刀表、规模数字、接缝计数都是「方案乙」口径，与最终落地不同；执行以 `DECISIONS.md` + `STATUS.md` 为准。**
+
 > **本文是自包含的完整执行计划：照着做不需要读 v1/v2。**
-> 采用**方案乙**——`program/` 只搬**服务端半边** + `platform/`，`network/` 不搬。
+> 采用**方案乙**——`program/` 只搬**服务端半边** + `platform/`，`network/` 不搬。**（此口径已作废，见顶部横幅）**
 > v1（[`RESTORE_PLAN.md`](./RESTORE_PLAN.md)）、v2（[`RESTORE_PLAN_V2.md`](./RESTORE_PLAN_V2.md)）
-> 是决策过程记录，保留作历史；**有冲突以本文为准**。
+> 是决策过程记录，保留作历史；**有冲突以 `DECISIONS.md` §四（方案甲）为准。**
 >
 > 规矩（[`UPSTREAM_COMPARISON.md`](./UPSTREAM_COMPARISON.md) §2 + v1 原则）：
 > **对标原版不许结构删减**、**不引入本仓自创结构**。改动只有四类可接受——
