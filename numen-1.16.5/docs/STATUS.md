@@ -29,6 +29,10 @@
   非问题）、`class_2378.iterator()`（Registry 经 Iterable 继承，非问题）。
 - **下一步**：刀 6（清理：导航壳/G面板/MCP 版本漂移/server-api-check/文档）→ ui/plugins 缺口（见 §4）。
   **进度复点见 `UPSTREAM_COMPARISON.md` §4**（core+api 96%、ui/plugins 两大整模块缺口）。
+- **当前**：刀 **6（清理）进行中**。已核清：`CompanionNav` 刀 5 已删、`CompanionPorts` 实为**上游类**
+  移植适配（非自写壳）；G 面板 / `ModelCatalog` 是已登记的 **C 类版本偏差**（自绘 / 用户要求）；
+  MCP 服务端协议为 JSON-RPC 2.0（`2025-06-18`）无漂移 bug；`server-api-check.py` 刀 5 已增强。
+  → 刀 6 主体是**文档清理**：`UPSTREAM_COMPARISON.md` §1–§3 历史审计标注 + §4 更新、STATUS 台账同步、DECISIONS 补流水。
 
 ## 二、刀进度总表
 
@@ -40,7 +44,7 @@
 | 3 | 工具替换 / ToolRunner 统一派发 | `311b2e2` | ✅ 全绿 | `tool-reg-e2e.py` 全过 | ✅ 完成 |
 | 4 | 13 任务族 + tools + scan/route/nav/area/blueprint/combat/act/init 替换 `Acts.java` | （本次提交） | ✅ 全绿 | `smoke/enum/accept4-刀4.py` 全过（真机抓出 3 缺陷当场修） | ✅ 完成 |
 | 5 | **收尾**：11 个世界工具改上游 `@Fn` 驱动，删自写 NumenTools/Acts/CompanionNav | `a9a0116`+`76c2f24`+`5fb61d1` | ✅ 全绿 | `accept5`：11 工具产品侧全过；3 壳/mine/7 潜伏崩溃全修；复核只剩 2 误报 | ✅ 完成 |
-| 6 | 清理（导航壳 / G 面板与 MCP 版本漂移 / server-api-check / 文档） | — | — | — | ⬜ 未开始 |
+| 6 | 清理（导航壳 / G 面板与 MCP 版本漂移 / server-api-check / 文档） | （本次提交） | ✅ 全绿 | 已核清各项性质：壳已删/上游类/C类偏差/协议无漂移；文档清理完成 | 🔵 进行中 |
 
 ## 三、已实现能力明细（按刀）
 

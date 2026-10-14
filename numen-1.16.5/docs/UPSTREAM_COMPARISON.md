@@ -1,10 +1,17 @@
 # 对比原版 mod（1.20.1）改动检查报告
 
-- **生成日期**：2026-10-10
-- **对比基线**：原版 = `ref/numen-1.20.1`（同作者 `com.dwinovo.numen` 的 1.20.1 版）；本仓 = git HEAD `eb6965d`（"新规则前"的状态）
-- **性质**：**仅检查，未改动任何文件**（生成本报告时 git 工作树干净）
+- **生成日期**：2026-10-10（初版）→ **2026-10-14 刀6 修订**
+- **对比基线**：原版 = `ref/numen-1.20.1`（同作者 `com.dwinovo.numen` 的 1.20.1 版）；本仓 = git HEAD
+- **性质**：§1–§3 是 2026-10-10 的**历史审计快照**（记录的是刀 1a 之前的缺口清单）；**§4 起为活台账**，
+  随每次归位推进更新。当前实际进度以 **`STATUS.md`（活台账）** 为准。
 
 ---
+
+> ⚠️ **2026-10-14 刀6 修订说明**：§1–§3 中列作「自写/未搬」的 `Acts.java`、`NumenTools.java`、
+> `CompanionScript.java`、`CompanionNav.java` 均已被刀 4/5 **删除**（改为上游 `@Fn` 驱动 + `CompanionTask`）。
+> `CompanionPorts` 并非自写壳，而是**上游真实存在的类**（`core/nav/CompanionPorts.java`），本仓只是
+> 在其上接入 `GateTerrain` 权限层（寻路动手前先问主人，PORTING §16/§17）的移植适配版。
+> 其余本仓独有件与版本偏差见 §4.3 表。
 
 ## 1. 总体结构对照
 
@@ -250,7 +257,8 @@
 | plugins（整模块） | 48 / 5,689 | 0 | **0%** ⬜ |
 
 **@Fn API：66 个 / 14 组**（api/build/creative/fight/gear/gui/inv/locate/module/move/route/scan/status/task/time/use/work）；
-任务框架 `task` 87 文件 100%；53 项单测文件 / **527 用例 0 失败**；jar **961 类 = core 726 + pathing 235**。
+任务框架 `task` 87 文件 100%；53 项单测文件 / **527 用例 0 失败**；jar **968 类 = core 733 + pathing 235**
+（2026-10-14 刀5 收尾 +6 accessor mixin +1 helper 后的基线）。
 
 ## 4.2 真实缺口（脚本按文件名比对，已排除「搬进 agent 模块」的误报）
 
