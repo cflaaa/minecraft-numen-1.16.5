@@ -719,7 +719,7 @@ public final class NumenPanelScreen extends Screen {
                 cycleFocus();
                 return true;
             }
-            if (focused.keyPressed(keyCode)) {
+            if (focused.keyPressed(keyCode, modifiers)) {
                 return true;
             }
         }

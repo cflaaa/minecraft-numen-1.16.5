@@ -1,6 +1,7 @@
 package com.dwinovo.numen.core.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import org.lwjgl.glfw.GLFW;
 
@@ -12,8 +13,9 @@ import org.lwjgl.glfw.GLFW;
  * 还得自己补背景。既然背景、边框、光标都要自己画，不如连编辑逻辑一起收进来，
  * 省掉「子控件由 Screen 统一渲染、必然被面板盖住」这个顺序问题。
  *
- * <p>支持：输入、退格、Delete、左右、Home/End、点击定位光标。就这些——面板上要填的是
- * 名字、一句话、模型名、密钥，没有多行和选区。
+ * <p>支持：输入、退格、Delete、左右、Home/End、点击定位光标，以及
+ * <b>Ctrl+V 粘贴 / Ctrl+C 复制</b>（API key 这类长文本没法手打，2026-10-14 补）。
+ * 没有多行和选区——所以没有 Ctrl+A 全选 / Ctrl+X 剪切。
  */
 public final class NumenField {
 
@@ -97,8 +99,28 @@ public final class NumenField {
         cursor = best;
     }
 
-    /** 被吃掉的按键返回 true。 */
+    /** 被吃掉的按键返回 true。旧签名保留（视为无修饰键）。 */
     public boolean keyPressed(int keyCode) {
+        return keyPressed(keyCode, 0);
+    }
+
+    /**
+     * 被吃掉的按键返回 true。{@code mods} 是 GLFW 修饰键位掩码
+     * （{@code Screen.keyPressed} 的第三参原样传进来）。
+     */
+    public boolean keyPressed(int keyCode, int mods) {
+        if ((mods & GLFW.GLFW_MOD_CONTROL) != 0) {
+            var keyboard = Minecraft.getInstance().keyboardHandler;
+            if (keyCode == GLFW.GLFW_KEY_V) {
+                paste(keyboard.getClipboard());
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_C) {
+                keyboard.setClipboard(value);
+                return true;
+            }
+            return false;
+        }
         switch (keyCode) {
             case GLFW.GLFW_KEY_BACKSPACE -> {
                 if (cursor > 0) {
@@ -149,6 +171,28 @@ public final class NumenField {
         value = value.substring(0, cursor) + c + value.substring(cursor);
         cursor++;
         return true;
+    }
+
+    /**
+     * 在光标处粘入剪贴板文本。丢掉控制字符和换行（密钥/URL/模型名都不该有），
+     * 超出 {@link #maxLength} 的部分直接截掉。
+     */
+    private void paste(String text) {
+        if (text == null || text.isEmpty()) {
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < text.length() && value.length() + sb.length() < maxLength; i++) {
+            char c = text.charAt(i);
+            if (c >= ' ' && c != 127) {
+                sb.append(c);
+            }
+        }
+        if (sb.length() == 0) {
+            return;
+        }
+        value = value.substring(0, cursor) + sb + value.substring(cursor);
+        cursor += sb.length();
     }
 
     /**
