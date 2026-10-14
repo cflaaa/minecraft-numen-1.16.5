@@ -42,10 +42,12 @@ public record Target(BlockPos cell, Block block) {
                 return new Target(cell, null);
             }
             ResourceLocation id = ResourceLocation.tryParse(name);
-            if (id == null || !Registry.BLOCK.containsKey(id)) {
+            // 1.16.5 差异：服务端 jar 裁了 Registry.containsKey(ResourceLocation)；get(id) 缺失返回 null。
+            Block block = id == null ? null : Registry.BLOCK.get(id);
+            if (block == null) {
                 throw new BadValue("expected a Block's name to be a block id; got " + BadValue.given(value));
             }
-            return new Target(cell, Registry.BLOCK.get(id));
+            return new Target(cell, block);
         }
 
         @Override

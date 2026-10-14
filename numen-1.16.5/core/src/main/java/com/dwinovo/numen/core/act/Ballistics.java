@@ -298,10 +298,12 @@ public final class Ballistics {
                 from.x - hitboxRadius, from.y - hitboxRadius, from.z - hitboxRadius,
                 from.x + hitboxRadius, from.y + hitboxRadius, from.z + hitboxRadius);
         AABB sweep = hitbox.expandTowards(to.subtract(from)).inflate(1.0);
+        // 1.16.5 差异：服务端 jar 裁了带距离上限的 (Entity, Vec3, Vec3, AABB, Predicate, double) 重载，
+        // 只剩 (Level, Entity, Vec3, Vec3, AABB, Predicate) 这一版（多参那版是客户端瞄准走的路）。
+        // 改走 Level 版、第一参传 level（射线范围仍由 sweep 包住，语义等价）。
         EntityHitResult hit = ProjectileUtil.getEntityHitResult(
-                shooter, from, to, sweep,
-                e -> e != shooter && e != target && !e.isSpectator() && e.isPickable() && e.isAlive(),
-                Double.MAX_VALUE);
+                shooter.level, shooter, from, to, sweep,
+                e -> e != shooter && e != target && !e.isSpectator() && e.isPickable() && e.isAlive());
         return hit == null ? Double.MAX_VALUE : hit.getLocation().distanceToSqr(from);
     }
 

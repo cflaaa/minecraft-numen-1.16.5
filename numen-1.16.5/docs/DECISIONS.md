@@ -128,6 +128,7 @@
 
 | 日期 | 决策 / 事件 | 落地 |
 |---|---|---|
+| 2026-10-14 | **刀 5 收尾：7 处真·潜伏崩溃全部修完**。`server-api-check.py` 补两处网（① 构造器调用也抠——成员名带引号；② 输出带来源类）后一次扫出 **13 条真缺 + 1 误报**，逐条在运行时服务端 intermediary jar javap 核真、全部修完（PORTING §20）：`FakeClient` 换维度/回传聊天（packet 字段 accessor）、爬行者 `getSwellDir/isIgnited/isPowered`（实体数据键）、远程 `getEntityHitResult(Level,…)`、合成 `Ingredient`（@Invoker dissolve）、建造 `new ItemStack(block)` / `TranslatableComponent(getDescriptionId())`、Lua 查注册表 `get(id)!=null`、`Hotbar` 换 `pickSlot`/自写 `swapOffhand`。**复核只剩 2 误报**（`class_310` 客户端类、`Registry.iterator()` 继承 Iterable）。⚠️ 教训：一次只修一个调用点不够——`isPowered()` 藏在 `blastSpanOf()` 是复核第二次扫出来的 | 本次提交、STATUS.md |
 | 2026-10-13 | **全量文档更新 + 台账理顺**：核对所有说明文档，查实「刀 5 = 工具改 `@Fn` 驱动重接」（不是原计划的「清理」）；原「清理」改列**刀 6**；README / `RESTORE_PLAN_V3`（加作废横幅）/ 本文件 / `UPSTREAM_COMPARISON` 同步更正 | `0b07064` |
 | 2026-10-13 | **11 处「合并 jar 有、运行服务端 jar 没有」逐条 javap 核真**：关键结论「真机 8/11 通过 ≠ 这些安全」——潜伏崩全在未测路径上；确认 **7 处真·潜伏崩溃** + 2 处待现场确认；`Registry.iterator()`（继承 `Iterable`）与整类 `class_310`（只被 `core/client/*` 引用）判为误报 / 非问题 | `a6f1832`、UPSTREAM §4.4 |
 | 2026-10-13 | **R4 可复用脚本入 `tools/`**：21 个脚本入库（搬运/重映射/分析 9 + e2e 8 + NAS 部署 3）+ `nas_creds.py` 口令脱敏；`git-audit.py` 修 `__pycache__/*.pyc` 误报（否则一编译就拦提交） | `8ba51cc` |

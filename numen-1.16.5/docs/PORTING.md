@@ -1940,3 +1940,60 @@ remapper 的老坑用 `remapperIsolation` 压住，pathing 没被裁）；真机
 > 上次栽在「合并 jar 有、服务端 jar 没有」的成员上，这次栽在「参数语义搞错」上——都是编译期看不出的坑。
 
 
+## 二十、刀 5 收尾：把「合并 jar 有、专用服务端 jar 没有」的成员**全部**修完（2026-10-13/14）
+
+§11 那一轮修的是 **pathing** 侧的 7 处；本轮是刀 5（世界工具改 `@Fn` 驱动）暴露的**另一批**——
+`server-api-check.py` 补上「构造器也要抠」之后（见 §11.3 的同类补网），一次扫出 **13 条真缺 + 1 条误报**。
+逐条在**运行时**那份 `server-intermediary.jar` 上 javap 核过存在性与可见性，全部换成服务端安全的写法。
+
+### 20.1 关键：给 `server-api-check.py` 补了两处网
+
+1. **构造器调用被整条跳过**：字节码注释里构造器长这样
+   `// Method net/minecraft/class_2793."<init>":(I)V`，成员名**带引号**；老正则的字符类没含 `"`。
+   于是所有构造器调用都没被检查——实测漏掉了 `new ServerboundAcceptTeleportationPacket(int)`（见 20.3 条 1）。
+   修法：成员名字符类加 `"`，并把 `<init>` 归一到「类简单名」与服务端成员表对齐。
+2. **输出带来源类**：缺成员时打印「被调于 com.…」，一眼看出是谁在调、判可达性。
+   这条直接定位了本轮最隐蔽的两处（`class_2838/2846` 来自 **pathing 的 `Hotbar`**，在 core 源码里搜不到）。
+
+### 20.2 本轮的 13 处真缺（含修复）
+
+| # | 被裁成员（named） | 调用点 | 修法 |
+|---|---|---|---|
+| 1 | `ServerboundAcceptTeleportationPacket(int)` 构造 | `FakeClient.answer` | `@Accessor` 无参构造 + 直写 `id` |
+| 2 | `ClientboundPlayerPositionPacket.getId()` | `FakeClient.onOutbound` | `@Accessor("id")` 直取字段 |
+| 3 | `ClientboundChatPacket.getMessage()` | `FakeClient.onOutbound` | `@Accessor("message")` 直取字段 |
+| 4 | `ServerboundPickItemPacket(int)` 构造 | `pathing/body/Hotbar.hold` | 改直调 `inventory.pickSlot(slot)` |
+| 5 | `ServerboundPlayerActionPacket(Action,BlockPos,Direction)` 构造 | `pathing/body/Hotbar.hold` | 自写 `swapOffhand`（`getItemInHand`/`setItemInHand` 互换） |
+| 6 | `Boat.setInput(ZZZZ)` | `entity/InputDriver` | `@Accessor` 直写 4 个 `input*` 字段 |
+| 7 | `Creeper.getSwellDir()/isIgnited()/isPowered()` | `combat/Menace.{fusing,blastSpanOf}` | `@Accessor` 取 `DATA_SWELL_DIR`/`DATA_IS_IGNITED`/`DATA_IS_POWERED` 键，读实体数据。⚠️ 第一次只修了 `fusing()`，`blastSpanOf()` 里还藏着第二个 `isPowered()`，是 `server-api-check` 复核时扫出来的 |
+| 8 | `ProjectileUtil.getEntityHitResult(Entity,…,double)` | `act/Ballistics` | 换存在的 `(Level,Entity,…)` 重载 |
+| 9 | `Ingredient.getItems()` | `tools/{CraftOps,RecipeBook,RecipeProbe}` | `@Invoker dissolve()` + `@Accessor("itemStacks")`，收进 `core/mc/Ingredients` |
+| 10 | `Block.getCloneItemStack(BlockGetter,BlockPos,BlockState)` | `build/BuildStates` | 该 named 实现就是 `new ItemStack(block)`，直接等价替换 |
+| 11 | `Block.getName()` | `task/build/BuildTaskRecord$Target` | 该 named 实现就是 `new TranslatableComponent(getDescriptionId())` |
+| 12 | `Registry.containsKey(ResourceLocation)` | `sdk/{Builtin,Target}` | 改 `get(id) != null` |
+| 13 | `Registry.iterator()` | `tools/perception/StatusApi` | **误报**：`class_2378 implements class_2359 extends java.lang.Iterable`，`iterator()` 继承而来 |
+
+### 20.3 三条要点
+
+1. **构造器也会被裁**，且只有服务端 jar 会露出来——`(int)`/`(Action,…)` 这种「客户端发包用的构造器」
+   在服务端整个消失（服务端只**收**这个包，只留无参构造 + 反序列化）。凡是服务端侧「假装客户端」造包
+   （`FakeClient`、`Hotbar`），都要走 `@Accessor` 直写字段或换服务端等价入口。
+2. **改法优先级**：能换服务端**存在的等价入口**就别上 mixin（`pickSlot`、`get(id)!=null`、`new ItemStack(block)`、
+   `TranslatableComponent(getDescriptionId())`、`getEntityHitResult(Level,…)`）；实在没有公开入口才 `@Accessor`
+   取私有字段/`@Invoker` 调私有方法。
+3. ⚠️ **`@Accessor` 强转 final 类要经 `Object` 中转**：`Ingredient` 是 final，`(IngredientAccessor) ing`
+   编译不过（编译器不认 final 类实现了该接口），必须 `(IngredientAccessor) (Object) ing`。
+
+### 20.4 验证
+
+- `:core:build` 绿（含 527 单测）；clean 重建 jar = **968 类 = core 733 + pathing 235**
+  （+5 新 accessor mixin +1 helper；pathing 235 未丢）。
+- **真机 A**（`accept5.py`，11 世界工具直调）：**9/11**，未过的 5-6/5-8 是脚本断言写错（上游正确报错）。
+  服务端**带 5 个新 accessor 正常启动**（`required` 模式下 mixin 解析失败即崩服）。
+- **真机 B**（`accept5b.py`，专测本轮路径，走 Lua）：**7/7 全过**，**服务端异常行 0 条**：
+  - `numen.inv.recipes/craftable`（Ingredient.getItems）→ `ingredients = {"planks(any)"}` / `any[oak_log/…]`
+  - `numen.build.diff`/`place`（Block.getCloneItemStack + getName）→ `built 1/1 block(s)`
+  - 不存在的方块名 → `bad_argument — Unknown block type`（正确拒绝，不崩）
+- `server-api-check.py` 复核：13 条真缺**全部消失**，只剩 §20.2 条 13 那条 `iterator()` 误报。
+
+

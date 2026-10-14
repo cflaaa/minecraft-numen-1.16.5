@@ -192,10 +192,13 @@ final class Builtin {
         @Override
         public net.minecraft.world.level.block.Block decode(Object value) {
             ResourceLocation id = ID.decode(value);
-            if (!net.minecraft.core.Registry.BLOCK.containsKey(id)) {
+            // 1.16.5 差异：服务端 jar 裁了 Registry.containsKey(ResourceLocation)。
+            // get(id) 在缺失时返回 null，等价判据（见 named 合并 jar：containsKey 即 get != null）。
+            net.minecraft.world.level.block.Block block = net.minecraft.core.Registry.BLOCK.get(id);
+            if (block == null) {
                 throw new BadValue("there is no block " + id);
             }
-            return net.minecraft.core.Registry.BLOCK.get(id);
+            return block;
         }
 
         @Override

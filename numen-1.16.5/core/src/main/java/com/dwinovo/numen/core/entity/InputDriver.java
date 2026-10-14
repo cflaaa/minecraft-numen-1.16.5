@@ -44,7 +44,7 @@ public final class InputDriver {
             double dz = target.z - boat.getZ();
             float want = (float) (Math.toDegrees(Math.atan2(dz, dx)) - 90.0);
             float diff = Mth.wrapDegrees(want - boat.yRot);
-            boat.setInput(diff < -BOAT_TURN_DEADBAND, diff > BOAT_TURN_DEADBAND, true, false);
+            setInput(boat, diff < -BOAT_TURN_DEADBAND, diff > BOAT_TURN_DEADBAND, true, false);
             ((BoatAccessor) boat).numen$controlBoat();
             face(p, target);   // 乘员朝向不驱动船,看向去处只是像个人
             return;
@@ -56,9 +56,22 @@ public final class InputDriver {
     /** 松舵:船停桨,她的走路键松开。离开驾驶状态的每刻收尾。 */
     public static void haltVehicle(NumenPlayer p) {
         if (p.getVehicle() instanceof Boat boat) {
-            boat.setInput(false, false, false, false);
+            setInput(boat, false, false, false, false);
         }
         p.controls().stop();
+    }
+
+    /**
+     * 给船设输入。⚠️ 不能调 {@code boat.setInput(...)}：那个方法在**专用服务端 jar 里被裁掉了**
+     * （它只写 4 个私有 boolean 字段，是客户端驾驶才调的方法）。这里经 {@link BoatAccessor}
+     * 直写同样的 4 个字段，语义与真玩家按 WASD 一致。
+     */
+    private static void setInput(Boat boat, boolean left, boolean right, boolean up, boolean down) {
+        BoatAccessor a = (BoatAccessor) boat;
+        a.numen$setInputLeft(left);
+        a.numen$setInputRight(right);
+        a.numen$setInputUp(up);
+        a.numen$setInputDown(down);
     }
 
     /** Turn the body (and head) to face {@code target} horizontally — walking goes where yaw points. */

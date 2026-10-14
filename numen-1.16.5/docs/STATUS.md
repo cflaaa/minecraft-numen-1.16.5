@@ -4,7 +4,7 @@
 > 之后的修改、更新、修 bug 同样要在实际测试完成后及时记录进来（2026-10-12 拍板）。
 > 分工：决策看 `DECISIONS.md`，技术细节与踩坑看 `PORTING.md`（引用 §号），执行计划看 `RESTORE_PLAN_V3.md`。
 
-**最后更新**：2026-10-13（保存方式整改 + 脚本入 `tools/` + mine 修复 + **台账理顺：刀5实为重接**）
+**最后更新**：2026-10-14（刀 5 收尾：7 处潜伏崩溃全修完，`server-api-check` 复核只剩 2 条误报）
 
 ---
 
@@ -13,19 +13,21 @@
 - **策略**：方案甲 —— 上游文件逐字照搬，只在 1.16.5 API 真不同处适配（A类照搬 / B类适配）。
 - **已落地**：刀 1a / 1b / 2 / 3 / **4** 全部提交并真机验收；工作树干净。
 - **双环境验收**：环境A（本机 `.testserver/` 完整回归）✅；**环境B（NAS 真实部署 + 跨机原版客户端）✅**（2026-10-13）。
-- **构建**：`:core:build` 绿（含 527 单测 0 失败）；发行 jar **962 类 = core 727 + pathing 235**
-  （刀 5 删 NumenTools/Acts/CompanionNav 后由 968 降至此；core 727 是事故反编译恢复后的实际值，
-  pathing 235 未丢——loom 0.12 跨项目 remapper 的老坑仍靠 `remapperIsolation` 压住）；五件套嵌入
+- **构建**：`:core:build` 绿（含 527 单测 0 失败）；发行 jar **968 类 = core 733 + pathing 235**
+  （本轮 +6 accessor mixin +1 helper；core 733；pathing 235 未丢——loom 0.12 跨项目 remapper
+  的老坑仍靠 `remapperIsolation` 压住）；五件套嵌入
   （agent / ai / lua / slf4j-api 1.7.36 / log4j-slf4j-impl 2.8.1）。
 - **脚本入库（R4）**：可复用脚本已从被忽略的 `.workbuddy-ai/tmp/` 搬进 **`tools/` 入库**——
   搬运/重映射/分析 9 个 + 环境 A/B e2e 验收 8 个 + NAS 部署 3 个 + `nas_creds.py`（凭据读取器）。
   **NAS 口令不再写死**（`nas_creds` 三级回退：`NUMEN_NAS_*` → 本机私有 `ssh-run.py` → `.nas-creds.env`）。
   提交 `d6abbdb`；细则见 `GIT_SAFETY.md` R4。
-- **当前**：刀 **5（收尾）进行中**。这次刀 5 的实体是「**11 个世界工具改上游 `@Fn` 驱动**，删自写
+- **当前**：刀 **5（收尾）完成**。这次刀 5 的实体是「**11 个世界工具改上游 `@Fn` 驱动**，删自写
   NumenTools/Acts/CompanionNav」（提交 `a9a0116`），验收扫出并已修：3 处 `NoSuchMethodError`（`76c2f24`）、
-  `mine` 生存挖不动（`5fb61d1`，PORTING §19）。**已逐条 javap 核真**：剩 **7 处真·潜伏崩溃待修**
-  （FakeClient 换维度/回传聊天、爬行者/远程/合成/建造/Lua 查注册表，§4.4 条2）+ 2 处待现场确认；余者已排除误报。
-- **下一步**：修那 7 处潜伏崩溃 → 刀 6（清理：导航壳/G面板/MCP 版本漂移/server-api-check/文档）→ ui/plugins 缺口（见 §4）。
+  `mine` 生存挖不动（`5fb61d1`，PORTING §19）。**7 处真·潜伏崩溃全部修完**（`server-api-check.py` 补
+  两处网后一次扫出 13 条真缺 + 1 误报，逐条 javap 核真；FakeClient 换维度/回传聊天、爬行者/远程/合成/
+  建造/Lua 查注册表，§4.4 条2、PORTING §20）。**复核只剩 2 条误报**：`class_310`（客户端 Minecraft，
+  非问题）、`class_2378.iterator()`（Registry 经 Iterable 继承，非问题）。
+- **下一步**：刀 6（清理：导航壳/G面板/MCP 版本漂移/server-api-check/文档）→ ui/plugins 缺口（见 §4）。
   **进度复点见 `UPSTREAM_COMPARISON.md` §4**（core+api 96%、ui/plugins 两大整模块缺口）。
 
 ## 二、刀进度总表
@@ -37,7 +39,7 @@
 | 2 | Wardrobe 穿脱（VanillaArmor / FailureType） | `a7dedeb` | ✅ 全绿 | `gear-e2e.py` 全过 | ✅ 完成 |
 | 3 | 工具替换 / ToolRunner 统一派发 | `311b2e2` | ✅ 全绿 | `tool-reg-e2e.py` 全过 | ✅ 完成 |
 | 4 | 13 任务族 + tools + scan/route/nav/area/blueprint/combat/act/init 替换 `Acts.java` | （本次提交） | ✅ 全绿 | `smoke/enum/accept4-刀4.py` 全过（真机抓出 3 缺陷当场修） | ✅ 完成 |
-| 5 | **收尾**：11 个世界工具改上游 `@Fn` 驱动，删自写 NumenTools/Acts/CompanionNav | `a9a0116`+`76c2f24`+`5fb61d1` | ✅ 全绿 | `accept5`：11 工具产品侧全过；3 壳/mine 已修；**剩 7 处潜伏崩溃待修**（§4.4 条2） | 🔵 进行中 |
+| 5 | **收尾**：11 个世界工具改上游 `@Fn` 驱动，删自写 NumenTools/Acts/CompanionNav | `a9a0116`+`76c2f24`+`5fb61d1` | ✅ 全绿 | `accept5`：11 工具产品侧全过；3 壳/mine/7 潜伏崩溃全修；复核只剩 2 误报 | ✅ 完成 |
 | 6 | 清理（导航壳 / G 面板与 MCP 版本漂移 / server-api-check / 文档） | — | — | — | ⬜ 未开始 |
 
 ## 三、已实现能力明细（按刀）

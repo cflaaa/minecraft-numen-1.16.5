@@ -1,5 +1,6 @@
 package com.dwinovo.numen.core.tools;
 
+import com.dwinovo.numen.core.mc.Ingredients;
 import net.minecraft.core.RegistryAccess;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -47,7 +48,7 @@ public final class RecipeProbe {
                 return false;
             }
             for (Ingredient ing : ings) {
-                if (ing == null || ing.getItems() == null) {
+                if (ing == null || Ingredients.items(ing) == null) {
                     return false;
                 }
             }

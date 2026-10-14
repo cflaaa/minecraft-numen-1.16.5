@@ -4,6 +4,7 @@ import com.dwinovo.numen.agent.script.ApiError;
 import com.dwinovo.numen.agent.script.ErrorKind;
 import com.dwinovo.numen.core.PlayerInv;
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.dwinovo.numen.core.mc.Ingredients;
 import com.dwinovo.numen.core.sdk.Doc;
 import net.minecraft.core.Registry;
 import net.minecraft.resources.ResourceLocation;
@@ -260,7 +261,7 @@ public final class CraftOps {
     private static Item pickItem(Ingredient ing, Map<Item, Integer> pool) {
         Item best = null;
         int bestN = 0;
-        for (ItemStack s : ing.getItems()) {
+        for (ItemStack s : Ingredients.items(ing)) {
             int n = pool.getOrDefault(s.getItem(), 0);
             if (n > bestN) {
                 best = s.getItem();
@@ -312,7 +313,7 @@ public final class CraftOps {
         for (Map.Entry<String, int[]> e : tally.entrySet()) {
             int need = e.getValue()[0];
             int have = 0;
-            for (ItemStack s : rep.get(e.getKey()).getItems()) {
+            for (ItemStack s : Ingredients.items(rep.get(e.getKey()))) {
                 have += pool.getOrDefault(s.getItem(), 0);
             }
             if (have < need) {

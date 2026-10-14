@@ -1,6 +1,9 @@
 package com.dwinovo.numen.core.entity;
 
 import com.dwinovo.numen.core.event.NumenEvents;
+import com.dwinovo.numen.core.mixin.ClientboundChatPacketAccessor;
+import com.dwinovo.numen.core.mixin.ClientboundPlayerPositionPacketAccessor;
+import com.dwinovo.numen.core.mixin.ServerboundAcceptTeleportationPacketAccessor;
 import net.minecraft.network.chat.ChatType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -83,11 +86,15 @@ public final class FakeClient {
     /** 服务端刚往"客户端"发了一个包。 */
     public void onOutbound(Packet<?> packet) {
         if (packet instanceof ClientboundPlayerPositionPacket teleport) {
-            awaitingTeleport = teleport.getId();
+            // 1.16.5 差异：专用服务端 jar 里这个类连一个 ()I 方法都没有（getId() 被裁掉），
+            // 只能经 @Accessor 直取字段 id（见 PORTING.md §11.3）。
+            awaitingTeleport = ((ClientboundPlayerPositionPacketAccessor) teleport).numen$getId();
         } else if (packet instanceof ClientboundChatPacket said) {
             // 1.16.5 差异：上游的 ClientboundSystemChatPacket.content()/overlay() 在这里是
             // ClientboundChatPacket.getMessage()/getType()，动作栏那一档是 ChatType.GAME_INFO。
-            heard(said.getMessage(), said.getType() == ChatType.GAME_INFO);
+            // getMessage() 在专用服务端 jar 里被裁掉，经 @Accessor 直取字段 message。
+            heard(((ClientboundChatPacketAccessor) said).numen$getMessage(),
+                    said.getType() == ChatType.GAME_INFO);
         }
     }
 
@@ -125,6 +132,10 @@ public final class FakeClient {
         }
         int id = awaitingTeleport;
         awaitingTeleport = -1;
-        player.connection.handleAcceptTeleportPacket(new ServerboundAcceptTeleportationPacket(id));
+        // 1.16.5 差异：服务端 jar 里 ServerboundAcceptTeleportationPacket 只有无参构造，
+        // (int) 构造器被裁掉（这个包是客户端发的，构造它的是客户端）。无参构造 + 直写字段 id。
+        ServerboundAcceptTeleportationPacket ack = new ServerboundAcceptTeleportationPacket();
+        ((ServerboundAcceptTeleportationPacketAccessor) ack).numen$setId(id);
+        player.connection.handleAcceptTeleportPacket(ack);
     }
 }

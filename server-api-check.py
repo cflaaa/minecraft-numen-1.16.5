@@ -13,9 +13,12 @@
 
 做法：
   1. 用 javap -c 把模组 jar 里每条 `// Method/Field net/minecraft/...` 引用抠出来；
+     ⚠️ **构造器也要抠**：调用长这样 `// Method net/minecraft/class_2793."<init>":(I)V`，
+     成员名带引号；早先正则的字符类没含 `"`，于是**所有构造器调用被整条跳过**（曾因此漏掉
+     `new ServerboundAcceptTeleportationPacket(int)`，真机一传唤就 NoSuchMethodError）。已修。
   2. 从**运行时**那份 server-intermediary.jar 建一张「这个类（含其父类/接口链）
      到底有哪些成员」的表；
-  3. 对不上的报出来。
+  3. 对不上的报出来，并**打印每条引用的来源类**（诊断"谁在调"、判可达性用）。
 
 **客户端包例外**（2026-10-09 加）：
   `com.dwinovo.numen.core.client.*` 是**只该在客户端加载**的一层（由 fabric.mod.json 的
@@ -56,9 +59,13 @@ SERVER_JAR = sys.argv[2] if len(sys.argv) > 2 else os.path.join(
 #   // Method net/minecraft/class_1792.method_7848:()Lnet/minecraft/class_2561;
 #   // Field net/minecraft/class_1309.field_6004:D
 #   // InterfaceMethod net/minecraft/class_1935.method_7853:(...)L...;
+# ⚠️ 构造器调用长这样：// Method net/minecraft/class_2793."<init>":(I)V
+#   ——成员名**带引号**。早先正则的字符类没含 `"`，于是**所有构造器调用被整条跳过**
+#   （实测漏掉了 `new ServerboundAcceptTeleportationPacket(int)`：编译 jar 有 (int) 构造器、
+#   专用服务端 jar 只剩无参构造，真机一传唤就 NoSuchMethodError）。故成员名允许引号。
 REF_RE = re.compile(
     r"//\s*(?:Interface)?(?:Method|Field)\s+"
-    r"(net/minecraft/[\w/$]+)\.([\w$<>]+):(\S+)")
+    r"(net/minecraft/[\w/$]+)\.([\w$<>\"]+):(\S+)")
 CLASS_RE = re.compile(r"//\s*class\s+(net/minecraft/[\w/$]+)")
 
 _HEADER_RE = re.compile(
@@ -104,7 +111,13 @@ def refs_of(classes, jar):
         refs = set()
         used = set()
         for m in REF_RE.finditer(txt):
-            refs.add((m.group(1), m.group(2), m.group(3)))
+            owner, member, desc = m.group(1), m.group(2), m.group(3)
+            member = member.strip('"')
+            if member == "<init>":
+                # 构造器：服务端成员表按「类简单名」记（javap -s 打的是 class_2793()），
+                # 这里同步归一到类简单名，否则 `<init>` 永远对不上 → 漏报。
+                member = owner.rsplit("/", 1)[-1]
+            refs.add((owner, member, desc))
         for m in CLASS_RE.finditer(txt):
             used.add(m.group(1))
         per_class[cls] = (refs, used)
@@ -223,6 +236,15 @@ def main():
     for owner, name, desc in refs:
         by_owner[owner].append((name, desc))
 
+    # ⚠️ 追踪每个引用的来源类（诊断「谁在调」），缺成员时打印来源，便于判断可达性。
+    # 在 refs_of 里同时记 refs_from：{(owner,name,desc): [来源类…]}
+    refs_from = {}
+    for cls, (r, u) in per_class.items():
+        if cls.startswith(CLIENT_PKG):
+            continue
+        for (owner, name, desc) in r:
+            refs_from.setdefault((owner, name, desc), []).append(cls)
+
     print("\n逐个核对（沿父类/接口链找）…")
     missing_classes = []
     missing_members = []
@@ -254,7 +276,9 @@ def main():
             if owner != cur:
                 print("  %s" % owner)
                 cur = owner
+            srcs = sorted(set(refs_from.get((owner, name, desc), [])))
             print("      %s %s" % (name, desc))
+            print("          ← 被调于: %s" % (", ".join(srcs) if srcs else "?"))
     else:
         print("\n[OK] 所有引用的成员在服务端 jar 里都能找到")
 

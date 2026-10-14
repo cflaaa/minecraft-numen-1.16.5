@@ -2,6 +2,7 @@ package com.dwinovo.numen.core.combat;
 
 import com.dwinovo.numen.pathing.plan.Threat;
 import com.dwinovo.numen.pathing.search.Goals;
+import com.dwinovo.numen.core.mixin.CreeperAccessor;
 import com.dwinovo.numen.core.scan.NearbyEntities;
 
 
@@ -103,8 +104,14 @@ public final class Menace {
 
     /** 引信正在涨——它已经在倒计时,不是"可能会炸"。 */
     public static boolean fusing(Entity entity) {
-        return entity instanceof Creeper creeper
-                && (creeper.getSwellDir() > 0 || creeper.isIgnited());
+        if (!(entity instanceof Creeper creeper)) {
+            return false;
+        }
+        // 1.16.5 差异：服务端 jar 裁了 getSwellDir()/isIgnited()，改走实体数据键（同原版读法）。
+        CreeperAccessor a = (CreeperAccessor) creeper;
+        int dir = creeper.getEntityData().get(a.numen$getSwellDirKey());
+        boolean ignited = creeper.getEntityData().get(a.numen$getIsIgnitedKey());
+        return dir > 0 || ignited;
     }
 
     /**
@@ -150,7 +157,10 @@ public final class Menace {
     /** 爆炸伤害波及多远:原版爆炸的伤害到威力的<b>两倍</b>远归零。 */
     public static double blastSpanOf(Entity entity) {
         if (entity instanceof Creeper creeper) {
-            return (creeper.isPowered() ? CREEPER_BLAST_RADIUS * 2.0 : CREEPER_BLAST_RADIUS) * 2.0;
+            // 1.16.5 差异：服务端 jar 裁了 isPowered()，改走实体数据键 DATA_IS_POWERED（同 fusing() 的读法）。
+            boolean powered = creeper.getEntityData().get(
+                    ((CreeperAccessor) creeper).numen$getIsPoweredKey());
+            return (powered ? CREEPER_BLAST_RADIUS * 2.0 : CREEPER_BLAST_RADIUS) * 2.0;
         }
         return entity instanceof EndCrystal ? CRYSTAL_BLAST_RADIUS * 2.0 : 0.0;
     }

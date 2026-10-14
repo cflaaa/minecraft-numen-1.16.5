@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.Objects;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.TranslatableComponent;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -174,7 +175,10 @@ extends TaskRecord {
             desiredState = BuildStates.normalize(desiredState);
             item = Objects.requireNonNull(item, "item");
             pos = Objects.requireNonNull(pos, "pos").immutable();
-            label = label == null || label.isBlank() ? desiredState.getBlock().getName().getString() : label;
+            // 1.16.5 差异：服务端 jar 裁了 Block.getName()（named 实现即 new TranslatableComponent(getDescriptionId())，
+            // 见 named 合并 jar 反汇编），改用 getDescriptionId() 自拼，等价。
+            label = label == null || label.isBlank()
+                    ? new TranslatableComponent(desiredState.getBlock().getDescriptionId()).getString() : label;
         }
 
         public static Target removal(BlockPos pos, Block block) {

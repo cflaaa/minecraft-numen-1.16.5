@@ -146,7 +146,9 @@ public final class BuildStates {
         }
         if (level != null && !(state.getBlock() instanceof EntityBlock)) {
             try {
-                ItemStack picked = state.getBlock().getCloneItemStack((BlockGetter)level, pos, state);
+                // 1.16.5 差异：服务端 jar 裁了 Block.getCloneItemStack(BlockGetter,BlockPos,BlockState)。
+                // 该方法的实现就是 `new ItemStack(this)`（见 named 合并 jar 反汇编），这里直接等价替换。
+                ItemStack picked = new ItemStack(state.getBlock());
                 if (!picked.isEmpty()) {
                     return picked.getItem();
                 }

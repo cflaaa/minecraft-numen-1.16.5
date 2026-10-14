@@ -2,10 +2,6 @@ package com.dwinovo.numen.pathing.body;
 
 import java.util.Optional;
 
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.network.protocol.game.ServerboundPickItemPacket;
-import net.minecraft.network.protocol.game.ServerboundPlayerActionPacket;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.player.Inventory;
@@ -39,8 +35,7 @@ public final class Hotbar {
         Inventory inventory = body.inventory;
         if (slot == OFFHAND) {
             Item item = body.getOffhandItem().getItem();
-            body.connection.handlePlayerAction(new ServerboundPlayerActionPacket(
-                    ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND, BlockPos.ZERO, Direction.DOWN));
+            swapOffhand(body);
             return Optional.of(new BodyAction.Held(item, OFFHAND, inventory.selected));
         }
         if (slot < 0) {
@@ -59,7 +54,7 @@ public final class Hotbar {
         if (Inventory.isHotbarSlot(slot)) {
             return Optional.of(select(body, slot, item));
         }
-        body.connection.handlePickItem(new ServerboundPickItemPacket(slot));
+        inventory.pickSlot(slot);
         return Optional.of(new BodyAction.Held(item, slot, inventory.selected));
     }
 
@@ -139,6 +134,23 @@ public final class Hotbar {
         // 本仓的口径（见 conjure 与 Wardrobe）是直接置位——服务端逻辑读的就是这一格。
         body.inventory.selected = slot;
         return new BodyAction.Held(item, slot, slot);
+    }
+
+    /**
+     * 交换主副手（原版 F 键，即 {@code ServerboundPlayerActionPacket.Action.SWAP_ITEM_WITH_OFFHAND}）。
+     *
+     * <p>⚠️ 不能 new 那个包：{@code ServerboundPlayerActionPacket(Action,BlockPos,Direction)} 构造器
+     * 只在「合并的客户端+服务端 jar」里，专用服务端 jar 经 ProGuard 裁剪后只剩无参构造器
+     * （该包由客户端构造发送，服务端只收）。这里照服务端 {@code ServerGamePacketListenerImpl.
+     * handlePlayerAction} 的 SWAP 分支直写等价动作：主副手物品互换，再停用当前使用的物品
+     * （与真客户端按 F 键一致）。
+     */
+    private static void swapOffhand(ServerPlayer body) {
+        ItemStack main = body.getMainHandItem();
+        ItemStack off = body.getOffhandItem();
+        body.setItemInHand(InteractionHand.MAIN_HAND, off);
+        body.setItemInHand(InteractionHand.OFF_HAND, main);
+        body.stopUsingItem();
     }
 
     /**

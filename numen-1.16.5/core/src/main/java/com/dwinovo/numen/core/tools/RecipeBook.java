@@ -1,6 +1,7 @@
 package com.dwinovo.numen.core.tools;
 
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.dwinovo.numen.core.mc.Ingredients;
 import net.minecraft.core.Registry;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -96,7 +97,7 @@ public final class RecipeBook {
      * 东西上。合成缺料时说缺什么用的是同一套叫法。
      */
     static String describeIngredient(Ingredient ing) {
-        List<String> paths = java.util.Arrays.stream(ing.getItems())   // 1.21.1: getItems() -> ItemStack[]
+        List<String> paths = java.util.Arrays.stream(Ingredients.items(ing))   // 1.16.5: getItems() 服务端被裁，走 Ingredients.items
                 .map(s -> Registry.ITEM.getKey(s.getItem()).getPath())
                 .distinct()
                 .toList();
