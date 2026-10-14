@@ -86,6 +86,10 @@ JAVA_HOME=../.toolchain/jdk-17.0.20.1+1 ../.toolchain/gradle-7.6.4/bin/gradle :c
 ## 移植期高频坑（详见 PORTING.md，别重新踩）
 
 - **mixin 配置的 `package` 独占**：该包下只许有 mixin 类，否则服务端起不来。
+- **⚠️ 修「合并 jar 有、服务端 jar 没有」的成员，别只改 javap 报的那一个调用点**（2026-10-14 踩过）：
+  同一个被裁方法（如 `Creeper.isPowered()`）可能在**多个**方法里被调，一次只修一处后 `server-api-check`
+  复核还会再扫出第二个。**凡是 accessor/等价替换，改完必须把调用方在整个文件 + 跨模块 grep 全**
+  （`isPowered()` 就藏在 `Menace.blastSpanOf()`，第一轮只修了 `fusing()`）。
 - **core 单测跨到 pathing 带 MC 类型会 `NoSuchMethodError`**：已在 `core/build.gradle` 给 Test 加 `doFirst` 前置 named 输出（Loom 0.12.5 无 `namedElements`）。新写这类测试别以为是自己的错。
 - **`GateTerrain` 平时碰不到**：`RouteSpec.defaults()` 是 dig=false/place=false，`CostModel` 直接早退。真机测挖/垫三前提：场地密闭 + `/fill` 在世界高度内(0..255) + 目标埋脚下。
 - **原版不许把方块放进玩家自己身体里**：测试别点同伴脚下那格。
