@@ -4,7 +4,21 @@
 > 之后的修改、更新、修 bug 同样要在实际测试完成后及时记录进来（2026-10-12 拍板）。
 > 分工：决策看 `DECISIONS.md`，技术细节与踩坑看 `PORTING.md`（引用 §号），执行计划看 `RESTORE_PLAN_V3.md`。
 
-**最后更新**：2026-10-14（刀 6 完成：核清四项偏差性质 + 文档清理 + 真机冒烟全过）
+**最后更新**：2026-10-16（Linux 真机验收刀A；补一处注册表偏差）
+
+---
+
+## 〇、2026-10-16 Linux 真机（MSLX test1.16.5）
+
+- **平台**：MSLX `test1.16.5`（本机 docker 容器，25565，`/vol2/@appshare/MSLX/Servers/1`，
+  MCP `172.19.0.2:8765`）；驱动：op 假玩家 `TestBOT`（`mineflayer` keepalive + `inbox.txt`）+ MCP。
+- **刀A 三修**（`f04dfa5`）真机全过：
+  - 0001 同伴死亡崩溃：`/kill Alice` ×2 → **0 次** `Removing entity while ticking`，服务端不崩；
+  - 0002 外脑 tell：外脑开、apiKey 空时 `/numen tell Alice …` → `get_events` 收到 `<query>`；
+  - 0006 accessor 警告：启动日志 **0 条** `should be static`。
+- **新发现并修**（本提交）：`Companions.spawn` 绕过 `CompanionRegistry`（上游只有入册的 `summon`）→
+  从 MCP/`/numen summon`/面板服务出来的同伴**不落盘、不复活、不上花名册**。
+  改成委托给 `summon`；真机复验：`/kill Alice` → 5s 后 `Alice joined the game`（×2），名册可见。
 
 ---
 
