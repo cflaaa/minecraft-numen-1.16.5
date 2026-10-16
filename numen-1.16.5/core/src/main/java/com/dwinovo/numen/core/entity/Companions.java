@@ -49,6 +49,19 @@ public final class Companions {
     private static final Map<UUID, CompanionBrain> BRAINS = new LinkedHashMap<>();
 
     /**
+     * 死掉、等着本 tick 之后收掉的尸体（身体 UUID）。
+     *
+     * <p>{@link #onDeath} 跑在实体 tick 里（{@code NumenPlayer.tick} → {@code ServerLevel.tickNonPassenger}），
+     * 那一刻调 {@code PlayerList.remove} 会撞原版「Removing entity while ticking!」的保护。攒到这里，
+     * 由 {@link #tick}（挂在 {@code END_SERVER_TICK}，本 tick 的实体刻已全部走完）统一收。
+     *
+     * <p><b>别再退回 {@code server.execute}</b>：同线程时它当场内联执行，等于没推迟。
+     * 世界作废时随其它排队状态一起清掉。
+     */
+    private static final java.util.Set<UUID> PENDING_DESPAWN =
+            java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
      * 同伴 UUID → 主人 UUID。
      *
      * <p>给「大脑在服务端」这一侧按主人分东西用——模块目录 {@code lua/<主人>/} 就是她
@@ -263,6 +276,8 @@ public final class Companions {
 
     /** 服务端每刻调一次：让每只同伴的大脑往前走一步。 */
     public static void tick(MinecraftServer server) {
+        // 先收尸：这一刻之前死掉的，趁实体刻已结束移出世界（见 PENDING_DESPAWN）。
+        drainPendingDespawns(server);
         if (BRAINS.isEmpty()) {
             return;
         }
@@ -273,6 +288,24 @@ public final class Companions {
             } catch (RuntimeException ex) {
                 // 一只同伴的大脑炸了不能连累别人，更不能掀掉服务端主循环。
                 Constants.error("同伴 {} 的大脑 tick 抛了异常，跳过这一步", brain.name(), ex);
+            }
+        }
+    }
+
+    /**
+     * 把 {@link #PENDING_DESPAWN} 里的尸体移出世界。挂在 {@link #tick} 的最前，此刻实体刻已全部结束，
+     * {@code PlayerList.remove} 不会撞「Removing entity while ticking!」。
+     */
+    private static void drainPendingDespawns(MinecraftServer server) {
+        if (PENDING_DESPAWN.isEmpty()) {
+            return;
+        }
+        List<UUID> dead = new ArrayList<>(PENDING_DESPAWN);
+        PENDING_DESPAWN.removeAll(dead);
+        for (UUID uuid : dead) {
+            NumenPlayer body = NumenPlayer.findByUuid(server, uuid);
+            if (body != null) {
+                CompanionFactory.despawn(server, body);
             }
         }
     }
@@ -327,7 +360,9 @@ public final class Companions {
             syncRosterToOwner(server, owner);
         }
         body.setHealth(body.getMaxHealth());             // 存下的 .dat 是一具健康的身体，留给复活
-        server.execute(() -> CompanionFactory.despawn(server, body));   // 尸体在这 tick 之后安全收掉
+        // 尸体排到本 tick 末尾再收：onDeath 正跑在实体 tick 里，当场 despawn 会撞原版移除保护。
+        // 见 PENDING_DESPAWN —— 别再退回 server.execute（同线程不推迟）。
+        PENDING_DESPAWN.add(uuid);
     }
 
     /**
@@ -399,6 +434,7 @@ public final class Companions {
 
     static {
         ServerLifecycle.onStopped(PENDING_RESTORE::clear);
+        ServerLifecycle.onStopped(PENDING_DESPAWN::clear);
     }
 
     /** 每个服务端 tick 调一次：把记下的主人挨个恢复。一个主人恢复失败不牵连下一个。 */

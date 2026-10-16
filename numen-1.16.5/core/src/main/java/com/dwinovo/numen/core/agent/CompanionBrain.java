@@ -200,8 +200,14 @@ public final class CompanionBrain {
         return activity;
     }
 
-    /** 端点齐不齐，给命令读。 */
+    /** 端点齐不齐，给命令读（外接大脑开着时不看内置端点，见下）。 */
     public String unavailableReason() {
+        // 外接大脑（MCP）开着时内置端点不是必需的：主人的 /numen tell 话进事件队列，
+        // 由外脑经 get_events 取走、用 say 回话——这是外脑模式主人→同伴的唯一说话通道。
+        // 用 enabled 不用 driving：只要开着就允许话进队列，外脑短暂安静也不该把话丢掉。
+        if (McpMode.instance().enabled()) {
+            return null;
+        }
         return NumenConfig.get().missingReason();
     }
 

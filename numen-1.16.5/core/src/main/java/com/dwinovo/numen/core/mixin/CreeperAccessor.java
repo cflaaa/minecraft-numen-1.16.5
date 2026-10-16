@@ -18,11 +18,17 @@ import org.spongepowered.asm.mixin.gen.Accessor;
 public interface CreeperAccessor {
 
     @Accessor("DATA_SWELL_DIR")
-    EntityDataAccessor<Integer> numen$getSwellDirKey();
+    static EntityDataAccessor<Integer> numen$getSwellDirKey() {
+        throw new AssertionError();
+    }
 
     @Accessor("DATA_IS_IGNITED")
-    EntityDataAccessor<Boolean> numen$getIsIgnitedKey();
+    static EntityDataAccessor<Boolean> numen$getIsIgnitedKey() {
+        throw new AssertionError();
+    }
 
     @Accessor("DATA_IS_POWERED")
-    EntityDataAccessor<Boolean> numen$getIsPoweredKey();
+    static EntityDataAccessor<Boolean> numen$getIsPoweredKey() {
+        throw new AssertionError();
+    }
 }

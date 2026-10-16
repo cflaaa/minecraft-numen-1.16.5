@@ -108,9 +108,8 @@ public final class Menace {
             return false;
         }
         // 1.16.5 差异：服务端 jar 裁了 getSwellDir()/isIgnited()，改走实体数据键（同原版读法）。
-        CreeperAccessor a = (CreeperAccessor) creeper;
-        int dir = creeper.getEntityData().get(a.numen$getSwellDirKey());
-        boolean ignited = creeper.getEntityData().get(a.numen$getIsIgnitedKey());
+        int dir = creeper.getEntityData().get(CreeperAccessor.numen$getSwellDirKey());
+        boolean ignited = creeper.getEntityData().get(CreeperAccessor.numen$getIsIgnitedKey());
         return dir > 0 || ignited;
     }
 
@@ -159,7 +158,7 @@ public final class Menace {
         if (entity instanceof Creeper creeper) {
             // 1.16.5 差异：服务端 jar 裁了 isPowered()，改走实体数据键 DATA_IS_POWERED（同 fusing() 的读法）。
             boolean powered = creeper.getEntityData().get(
-                    ((CreeperAccessor) creeper).numen$getIsPoweredKey());
+                    CreeperAccessor.numen$getIsPoweredKey());
             return (powered ? CREEPER_BLAST_RADIUS * 2.0 : CREEPER_BLAST_RADIUS) * 2.0;
         }
         return entity instanceof EndCrystal ? CRYSTAL_BLAST_RADIUS * 2.0 : 0.0;
