@@ -86,6 +86,16 @@ JAVA_HOME=../.toolchain/jdk-17.0.20.1+1 ../.toolchain/gradle-7.6.4/bin/gradle :c
 ## 移植期高频坑（详见 PORTING.md，别重新踩）
 
 - **mixin 配置的 `package` 独占**：该包下只许有 mixin 类，否则服务端起不来。
+- **⚠️ 绝不在服务端运行中热替换 `mods/` 里的 jar**（2026-10-14 踩过）：Fabric 类加载是**懒加载**，
+  已加载的类没事，但之后**首次**要用到的类会报
+  `Failed to load class file for 'com.dwinovo.numen.core.entity.CompanionFactory'!`
+  （实测：跑了 1 小时后召唤同伴才炸，`create_companion` 表面回一句无关的 "needs an owner"，真因在服务端 WARN 里）。
+  **换 jar 必须重启服务端。**
+- **⚠️ 杀后台看门狗 ≠ 杀 java 服务端**（2026-10-14 踩过）：python 看门狗被停后，java 子进程会变**孤儿继续跑**，
+  占着 `world/session.lock` → 新实例起不来报 `java.nio.file.AccessDeniedException: .\world\session.lock`。
+  **重启前先按端口找 PID 杀干净**：`netstat -ano | grep :25565` 拿 PID → `Stop-Process -Id <pid> -Force`。
+- **Git Bash 下 `tasklist //FI "..."` 会静默返回空**（误导成"进程不在"）。判断进程用
+  `tasklist | grep -i java`、判断监听用 `netstat -ano | grep :25565`，别用带过滤参数的 tasklist。
 - **⚠️ 修「合并 jar 有、服务端 jar 没有」的成员，别只改 javap 报的那一个调用点**（2026-10-14 踩过）：
   同一个被裁方法（如 `Creeper.isPowered()`）可能在**多个**方法里被调，一次只修一处后 `server-api-check`
   复核还会再扫出第二个。**凡是 accessor/等价替换，改完必须把调用方在整个文件 + 跨模块 grep 全**

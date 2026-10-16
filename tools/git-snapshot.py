@@ -44,6 +44,7 @@ EXCLUDE_DIRS = {
     os.path.join("numen-1.16.5", "agent", "build"),
     os.path.join("numen-1.16.5", "ai", "build"),
     os.path.join("numen-1.16.5", "lua", "build"),
+    os.path.join("numen-1.16.5", "ui", "build"),
 }
 EXCLUDE_SUFFIX = (".class",)
 

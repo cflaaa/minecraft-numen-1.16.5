@@ -1,0 +1,10 @@
+{
+  "name": "numen-owner-bot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Linux 测试用主人假玩家（mineflayer）。替代 Windows 侧的图形客户端。",
+  "main": "owner-bot.js",
+  "dependencies": {
+    "mineflayer": "^4.39.0"
+  }
+}

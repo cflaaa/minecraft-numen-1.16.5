@@ -16,7 +16,8 @@ Numen 模组 **1.20.1 → 1.16.5 Fabric** 移植。仓库 `numen-1.16.5/`，上�
 `.toolchain/` 在**仓库根**（`我的世界/.toolchain/`），不在 `numen-1.16.5/` 里；gradle 要在 `numen-1.16.5/` 下跑：
 `JAVA_HOME="../.toolchain/jdk-17.0.20.1+1" ../.toolchain/gradle-7.6.4/bin/gradle :core:build`
 （Java 17 + 官方 Mojang 映射，勿改 Yarn）。报 `Could not download` 是 maven.fabricmc.net 抖动，重跑即可。
-**jar 类数基线随刀更新并记入 STATUS.md**（当前 620 = core 385 + pathing 235）。
+**jar 类数基线随刀更新并记入 STATUS.md**（当前 975 = core 740 + pathing 235；`ui` 模块走**嵌套 jar**，不计入平铺）。
+**五个模块**：`lua`/`agent`/`ai`/`ui`（纯 JVM，逐字照搬，`include` 成 jar-in-jar）+ `pathing`（对 MC 编译，class 平铺）+ `core`（模组本体）。
 
 ## 硬约束（详见 PORTING.md）
 - **发行 jar 丢 pathing 类**：loom 0.12 跨项目共享 TinyRemapperService 所致，已在 core+pathing 都加 `remapperIsolation.set(true)`。改完 pathing 要 clean 重建 + **逐个比对 jar 类名**（曾实测 346 = pathing 235 + core 111，数字随代码变）。
@@ -30,6 +31,9 @@ Numen 模组 **1.20.1 → 1.16.5 Fabric** 移植。仓库 `numen-1.16.5/`，上�
 - **原版不许把方块放进玩家自己身体里**：测试别点同伴脚下那格（`BlockItem.place` 必返 FAIL，§16.3）。
 
 ## 已落地大件
+- **`ui/` 组件库（移植原版 G 界面的地基，2026-10-15）**：新建纯 JVM 模块 `ui`（照搬上游 32 文件 + 21 测试，**零改动**，包名 `com.dwinovo.numen.client.ui`）；1.16.5 适配器在 `core/.../client/ui/mc/`（`McDrawSurface`/`McTextInput`/`Sprites`）+ `client/screen/GuiCompat` + `client/screen/UiTheme` + `client/data/ClientPrefs`。
+  **关键事实**：1.16.5 **没有 `GuiGraphics`**（绘制挂 `PoseStack`，走 `GuiComponent` 静态方法）；贴图要**先 `TextureManager.bind`**（无 `RenderSystem.setShaderTexture`）；`AbstractWidget.setFocused` 是 protected → 已开 access widener；**无 `setPosition`**，只有字段 `x`/`y`；`GuiEventListener` 不声明 `setFocused`/`isFocused`。
+  **进度**：阶段 1+2 ✅；阶段 3~6（面板主体 / 设置页 / 成员页 / skin·voice·stt）见 `.workbuddy-ai/memory/2026-10-15.md` 与任务 #92~#96。
 - **permission/ 17 件套**（Gate/Rule/PlacedBlocks/PermissionStore/ConsentDesk）+ `/numen permission|consent`，55 单测全绿；**Gate 已接进 `mine`/`use_block`/`drop` + Lua**（ASK 抛 `NEEDS_CONSENT`），真机 5/5（§14.2、§16）。
 - **`core/nav/GateTerrain` 接进寻路**（`CompanionPorts.TERRAIN`），真机 A/B/C 全过（§17）。
 - pathing：55 条编译差异全修（§10.1）；`Sight.march` 手搬 DDA，改动须重跑 20000 射线比对。

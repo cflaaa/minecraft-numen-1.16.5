@@ -36,6 +36,15 @@
   全过（新 jar 部署 → 服务端起 → 模组加载 → 干净退出）。
 - **下一步**：ui/plugins 两大整模块缺口（Q-01 / Q-02 待拍板，见 `DECISIONS.md` §五）；
   另有计划外缺口（Q-04：`data`/`debug`/`mc`/`config` 等 D 类待补）与 21 个反编译恢复文件补注释（§4.4 条4）。
+- **2026-10-15：撤销 G 界面移植，还原回自写 G 面板**（用户决定）。当时移植件全部是未提交改动，撤销三步：
+  ① `git restore` 三个被改文件（`core/build.gradle`、`settings.gradle`、`numen.accesswidener` ——
+  即 `include('ui')`、`include project(':ui')`、`AbstractWidget.setFocused` 三处）；
+  ② 删三个未入库目录（`ui/` 模块 53 文件、`core/.../numen/client/` 适配器 6 文件、`assets/numen_api/` 贴图 38 枚）；
+  ③ 自写界面 `com.dwinovo.numene.core.client/` 7 文件**未动**（本就不依赖移植件，grep 核过无引用；`NumenClientPrefs`/`NumenUi` 只是名字像）。
+  撤销前快照 `我的世界-backup/snapshot-20261015-175703`（repo.bundle + worktree.tar.gz）。
+  `:core:clean :core:build` 绿（527 单测 0 失败）；发行 jar 复测 **968 类**、嵌套 jar 5 件（ui 已不在）、
+  jar 内 ui 类/`numen_api` 贴图/`setFocused` 残留均为 0；自写面 10 个类完整在册。
+  背景：上游 `ui/` 当初按 Q-02「先登记 C 类，收尾刀再评估搬」，本次试搬阶段 1+2 后决定不采用。
 
 ## 二、刀进度总表
 

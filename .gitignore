@@ -37,6 +37,9 @@ __pycache__/
 *.pyc
 *.pyo
 
+# ---- Node（tools/linux/owner-bot 的依赖，npm install 生成）----
+**/node_modules/
+
 # ---- 系统 ----
 Thumbs.db
 desktop.ini

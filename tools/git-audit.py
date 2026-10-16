@@ -20,7 +20,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 HEAVY = (".toolchain/", ".testserver/", "ref/", ".git/")
 # 各模块的 gradle 输出目录（**精确列出**——不能用 `**/build/`，源码里就有同名包）
 GRADLE_OUT = ("numen-1.16.5/build/",) + tuple(
-    "numen-1.16.5/%s/build/" % m for m in ("core", "pathing", "agent", "ai", "lua"))
+    "numen-1.16.5/%s/build/" % m for m in ("core", "pathing", "agent", "ai", "lua", "ui"))
 # 有意忽略的文件（含明文密钥，故意不入库）
 ALLOW = ("ssh-run.py",)
 
@@ -40,6 +40,8 @@ def classify(path):
         return "ok"
     if "__pycache__/" in path:
         return "ok"      # Python 字节码缓存：可再生产物，忽略是有意的
+    if "/node_modules/" in path or path.startswith("node_modules/"):
+        return "ok"      # Node 依赖（npm install 生成，可再生产物）
     if path.startswith(HEAVY):
         return "ok"
     if path.startswith(ALLOW):

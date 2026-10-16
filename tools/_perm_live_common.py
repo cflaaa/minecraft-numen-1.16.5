@@ -13,25 +13,42 @@ import threading
 import time
 import urllib.request
 
-MC = r"C:\Users\cfl\Desktop\.minecraft"
-VER = "1.16.5-Fabric 0.19.5-2"
-VDIR = os.path.join(MC, "versions", VER)
-VJSON = os.path.join(VDIR, VER + ".json")
-JAVA = (r"C:\Users\cfl\AppData\Roaming\.minecraft\runtime"
-        r"\java-runtime-gamma-snapshot\bin\java.exe")
-NATIVES = os.path.join(VDIR, VER + "-natives")
-CLIENT_LOG = os.path.join(VDIR, "logs", "latest.log")
+IS_WIN = os.name == "nt"
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO_ROOT = os.path.abspath(os.path.join(HERE, ".."))
 
-TS = r"C:\Users\cfl\workbuddy-ai\我的世界\.testserver"
-SERVER_JAR = os.path.join(TS, "server.jar")
+# 主人 / 同伴 / 端口都能用环境变量覆盖（Linux 上 25565 常被别的服务占着）。
+PLAYER = os.environ.get("NUMEN_PLAYER", "T")
+COMPANION = os.environ.get("NUMEN_COMPANION", "Alice")
+PORT = os.environ.get("NUMEN_PORT", "25565")
+MCP_PORT = int(os.environ.get("NUMEN_MCP_PORT", "8766"))
+
+if IS_WIN:
+    # Windows：借 PCL 客户端（java-runtime）+ 客户端库跑 KnotServer；主人是图形客户端。
+    MC = r"C:\Users\cfl\Desktop\.minecraft"
+    VER = "1.16.5-Fabric 0.19.5-2"
+    VDIR = os.path.join(MC, "versions", VER)
+    VJSON = os.path.join(VDIR, VER + ".json")
+    JAVA = (r"C:\Users\cfl\AppData\Roaming\.minecraft\runtime"
+            r"\java-runtime-gamma-snapshot\bin\java.exe")
+    NATIVES = os.path.join(VDIR, VER + "-natives")
+    CLIENT_LOG = os.path.join(VDIR, "logs", "latest.log")
+    TS = r"C:\Users\cfl\workbuddy-ai\我的世界\.testserver"
+    SERVER_JAR = os.path.join(TS, "server.jar")
+    OWNER_BOT = None
+else:
+    # Linux：自包含标准 Fabric 服（tools/linux/setup-testserver.sh 建），
+    # 主人用 mineflayer 假玩家（tools/linux/owner-bot）代替图形客户端。
+    TOOL = os.environ.get("NUMEN_TOOLCHAIN", os.path.expanduser("~/.local/share/numen-toolchain"))
+    JAVA = os.environ.get("NUMEN_JAVA", os.path.join(TOOL, "jdk-17.0.20.1+1", "bin", "java"))
+    TS = os.environ.get("NUMEN_TS", os.path.join(REPO_ROOT, ".testserver"))
+    SERVER_JAR = os.path.join(TS, "fabric-server-launch.jar")
+    OWNER_BOT = os.path.join(HERE, "linux", "owner-bot", "owner-bot.js")
+    MC = VDIR = VJSON = NATIVES = None
+
 SERVER_LOG = os.path.join(TS, "logs", "latest.log")
 SERVER_OUT = os.path.join(TS, "perm-e2e-server.log")
 CLIENT_OUT = os.path.join(TS, "perm-e2e-client.log")
-
-PLAYER = "T"
-COMPANION = "Alice"
-PORT = "25565"
-MCP_PORT = 8766
 
 server = None
 client = None
@@ -66,6 +83,9 @@ def maven_path(name):
 
 
 def libraries():
+    # Linux 走 fabric-server-launch.jar，不需要客户端库清单。
+    if not IS_WIN:
+        return None, []
     d = json.load(open(VJSON, encoding="utf-8"))
     out = []
     for lib in d["libraries"]:
@@ -124,17 +144,28 @@ def start_server(libs):
     for p in (SERVER_LOG, CLIENT_LOG):
         if os.path.exists(p):
             os.replace(p, p + ".e2eprev")
+    if IS_WIN:
+        cmd = [JAVA, "-Xmx2G", "-Dfile.encoding=UTF-8", "-cp",
+               ";".join(libs + [SERVER_JAR]),
+               "net.fabricmc.loader.impl.launch.knot.KnotServer", "nogui"]
+    else:
+        cmd = [JAVA, "-Xmx2G", "-Dfile.encoding=UTF-8", "-jar", SERVER_JAR, "nogui"]
     server = subprocess.Popen(
-        [JAVA, "-Xmx2G", "-Dfile.encoding=UTF-8", "-cp",
-         ";".join(libs + [SERVER_JAR]),
-         "net.fabricmc.loader.impl.launch.knot.KnotServer", "nogui"],
-        cwd=TS, stdin=subprocess.PIPE,
+        cmd, cwd=TS, stdin=subprocess.PIPE,
         stdout=open(SERVER_OUT, "wb"), stderr=subprocess.STDOUT)
     return server
 
 
 def start_client(d, libs):
     global client
+    if not IS_WIN:
+        # Linux：主人是 mineflayer 假玩家（owner-bot），不是图形客户端。
+        env = dict(os.environ, MC_HOST="127.0.0.1", MC_PORT=PORT, MC_USER=PLAYER,
+                   MC_VERSION=os.environ.get("NUMEN_MCVER", "1.16.5"))
+        client = subprocess.Popen(
+            ["node", OWNER_BOT], cwd=os.path.dirname(OWNER_BOT), env=env,
+            stdout=open(CLIENT_OUT, "wb"), stderr=subprocess.STDOUT)
+        return client
     subs = {
         "natives_directory": NATIVES, "launcher_name": "PCL", "launcher_version": "2.9.0",
         "classpath": ";".join(libs + [os.path.join(VDIR, VER + ".jar")]),
@@ -161,7 +192,14 @@ def start_client(d, libs):
 def kill_all():
     for p in (client, server):
         if p is not None and p.poll() is None:
-            subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)
+            if IS_WIN:
+                subprocess.run(["taskkill", "/F", "/T", "/PID", str(p.pid)], capture_output=True)
+            else:
+                p.terminate()
+                try:
+                    p.wait(timeout=30)
+                except subprocess.TimeoutExpired:
+                    p.kill()
 
 
 # ---------------------------------------------------------------- MCP
