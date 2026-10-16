@@ -4,7 +4,7 @@ import com.dwinovo.numen.pathing.world.Bounds;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
-import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.BitStorage;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -12,6 +12,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.border.WorldBorder;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.Palette;
 import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.material.FluidState;
 
@@ -41,7 +42,7 @@ public final class WorldSnapshot implements SearchView {
     private final int minChunkZ;
     private final int side;
     /** [区块][区段]:区块没加载为 null,区段全空为 null。 */
-    private final PalettedContainer<BlockState>[][] chunks;
+    private final Section[][] chunks;
     private final int minBuildHeight;
     private final int height;
     private final int minSection;
@@ -54,7 +55,7 @@ public final class WorldSnapshot implements SearchView {
         this.minChunkX = centerX - radius;
         this.minChunkZ = centerZ - radius;
         this.side = 2 * radius + 1;
-        this.chunks = new PalettedContainer[side * side][];
+        this.chunks = new Section[side * side][];
         this.minBuildHeight = MIN_BUILD_HEIGHT;
         this.height = heights.getMaxBuildHeight();
         this.minSection = MIN_SECTION;
@@ -66,7 +67,7 @@ public final class WorldSnapshot implements SearchView {
                 if (sections == null) {
                     continue;
                 }
-                PalettedContainer<BlockState>[] states = new PalettedContainer[sections.length];
+                Section[] states = new Section[sections.length];
                 for (int s = 0; s < sections.length; s++) {
                     if (sections[s] != null && !sections[s].isEmpty()) {
                         states[s] = copy(sections[s]);
@@ -77,33 +78,40 @@ public final class WorldSnapshot implements SearchView {
         }
     }
 
-    /** 调色板 NBT 的两个键名：{@code PalettedContainer} 的 NBT 读写要成对给同一组名字。 */
-    private static final String KEY_PALETTE = "palette";
-    private static final String KEY_DATA = "data";
-    /** NBT 里 ListTag 的**元素**类型号：10 = CompoundTag（调色板每一项都是一个 CompoundTag）。 */
-    private static final int TAG_COMPOUND = 10;
+    /**
+     * 拷一份区段：**只拷底层位存储的 raw {@code long[]}，调色板共享**——不重打包、不走 NBT。
+     *
+     * <p>1.20 的 {@code PalettedContainer} 自带 {@code copy()}（1.16.5 没有）。曾经退而用 NBT 往返
+     * （{@code write}+{@code read}），但 {@code write} 会把 4096 格**逐格重打包**成一个新 {@code BitStorage}
+     * ——真机实测每段约 240µs，是主线程寻路 99% 的开销（2026-10-16 量化）。源段本来就有现成的位存储，
+     * 直接拷 raw 数组即可。
+     *
+     * <p><b>调色板为什么可以共享（不拷）</b>：源 {@code PalettedContainer} 对调色板只会
+     * <b>追加</b>（{@code idFor} 往末尾加）或在溢出时<b>整体换掉</b>（{@code onResize} 造一个新的、替换字段），
+     * 从不就地重排已有索引。快照拷的是那一刻的位存储，引用的是那一刻的调色板对象；之后主线程再改那一段，
+     * 既不影响我们拷下的索引（新加的索引用不到），也只在换调色板时把源指向新对象（我们手里的旧对象不再被改）。
+     * 既有条目在拷贝时的可见性由「拷贝在主线程、搜索经线程池派发」之间的 happens-before 保证。
+     *
+     * <p>实现见 core 的 {@code PalettedContainerAccessor} mixin（把 {@code palette}/{@code storage}/{@code bits}
+     * 露出来）。{@code access} 只在真实运行时有；单测不碰 {@link #copy}。
+     */
+    @SuppressWarnings("unchecked")
+    private static Section copy(LevelChunkSection section) {
+        PalettedContainer<BlockState> source = section.getStates();
+        PalettedContainerAccess<BlockState> access = (PalettedContainerAccess<BlockState>) source;
+        BitStorage storage = access.numen$storage();
+        BitStorage frozen = new BitStorage(access.numen$bits(), storage.getSize(), storage.getRaw().clone());
+        return new Section(access.numen$palette(), frozen);
+    }
 
     /**
-     * 拷一份区段的方块调色板。
-     *
-     * <p>1.20 的 {@code PalettedContainer} 自带 {@code copy()},**1.16.5 的没有**（既没有 {@code copy}
-     * 也没有 {@code clone}）。
-     *
-     * <p>⚠️ 也**不能用二进制那条路**：{@code LevelChunkSection.read(FriendlyByteBuf)} 在合并 jar 里有，
-     * 在**专用服务端的 jar 里被 ProGuard 裁掉了**（服务端只**写**区段、不**读**——读是收包那一方做的），
-     * 调了就是 NoSuchMethodError。所以走 **NBT 那条路**：{@code write(CompoundTag, String, String)} 与
-     * {@code read(ListTag, long[])} 在服务端**都在**，而且同样是一次数组拷贝（不是逐格复制）。
-     *
-     * <p>读写必须用**同一组键名**，调色板那一项是 `ListTag`、元素是 `CompoundTag`，所以
-     * {@code getList} 的类型号传 {@link #TAG_COMPOUND}。
+     * 一份只读的区段：调色板 + 一份拷下来的位存储。等价于 {@link PalettedContainer} 的只读视图，
+     * 索引公式与它一致（{@code (y<<8)|(z<<4)|x}，见 {@code PalettedContainer.getIndex}）。
      */
-    private static PalettedContainer<BlockState> copy(LevelChunkSection section) {
-        PalettedContainer<BlockState> source = section.getStates();
-        CompoundTag tag = new CompoundTag();
-        source.write(tag, KEY_PALETTE, KEY_DATA);
-        PalettedContainer<BlockState> target = new LevelChunkSection(0).getStates();
-        target.read(tag.getList(KEY_PALETTE, TAG_COMPOUND), tag.getLongArray(KEY_DATA));
-        return target;
+    private record Section(Palette<BlockState> palette, BitStorage storage) {
+        BlockState get(int x, int y, int z) {
+            return palette.valueFor(storage.get((y << 8) | (z << 4) | x));
+        }
     }
 
     /** 派发一次搜索时拷贝的半径(区块数):以起点所在区块为中心,边长 13 个区块,约两百格见方。 */
@@ -143,7 +151,7 @@ public final class WorldSnapshot implements SearchView {
         return copy;
     }
 
-    private PalettedContainer<BlockState>[] chunk(int x, int z) {
+    private Section[] chunk(int x, int z) {
         int i = SectionPos.blockToSectionCoord(x) - minChunkX;
         int j = SectionPos.blockToSectionCoord(z) - minChunkZ;
         if (i < 0 || j < 0 || i >= side || j >= side) {
@@ -159,7 +167,7 @@ public final class WorldSnapshot implements SearchView {
 
     @Override
     public BlockState getBlockState(BlockPos pos) {
-        PalettedContainer<BlockState>[] states = chunk(pos.getX(), pos.getZ());
+        Section[] states = chunk(pos.getX(), pos.getZ());
         if (states == null) {
             return AIR;
         }
@@ -173,7 +181,7 @@ public final class WorldSnapshot implements SearchView {
     /** 没加载的区块、全空的区段(拷贝时记为空)、建筑高度之外,读出来都是空气。 */
     @Override
     public boolean airSection(int x, int y, int z) {
-        PalettedContainer<BlockState>[] states = chunk(x, z);
+        Section[] states = chunk(x, z);
         if (states == null) {
             return true;
         }

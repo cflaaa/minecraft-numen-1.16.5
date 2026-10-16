@@ -16,6 +16,7 @@
         "ItemEntityTouchMixin",
         "ItemEntityAccessor",
         "MenuDataSlotsAccessor",
+        "PalettedContainerAccessor",
         "ServerboundAcceptTeleportationPacketAccessor",
         "ServerLevelBlockChangeMixin",
         "SlotAccessor"

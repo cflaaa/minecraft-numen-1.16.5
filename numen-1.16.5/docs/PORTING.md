@@ -1997,3 +1997,27 @@ remapper 的老坑用 `remapperIsolation` 压住，pathing 没被裁）；真机
 - `server-api-check.py` 复核：13 条真缺**全部消失**，只剩 §20.2 条 13 那条 `iterator()` 误报。
 
 
+
+
+## §21 1.16.5 没有 `PalettedContainer.copy()`：寻路快照的廉价拷贝（2026-10-16）
+
+**症状**：`[numen-path] … 主线程这一刻寻路用了 ~150ms`，100% 超阈，其中「拷快照」占 99%。
+
+**位置**：`pathing/.../search/WorldSnapshot.copy(LevelChunkSection)`（`Driver.dispatch` 在**主线程**调）。
+
+**根因**：上游 1.20 的快照拷贝是 `section.getStates().copy()`。1.16.5 的 `PalettedContainer` **没有 `copy()`**
+（也没有 `clone`），且服务端裁掉了 `LevelChunkSection.read(FriendlyByteBuf)`，于是本仓退而走 NBT
+（`write(CompoundTag,…)` + `read(ListTag, long[])`）。逐字节码看：**`write` 会把 4096 格逐格重打包**
+成一个新 `BitStorage`（`HashMapPalette` 重建 + `Mth.ceillog2` + `new BitStorage(4096)` + 循环 `set`），
+真机实测每段 ~240µs；`read` 才 ~18µs。数百段累计 ≈ 150ms。
+
+**修法**：源段本来就有现成的 `BitStorage`，直接拷它的 raw `long[]` 即可。
+- pathing：`PalettedContainerAccess<T>`（接口，`numen$palette/numen$storage/numen$bits`）；
+  `WorldSnapshot` 内部由 `PalettedContainer[][]` 换成只读 `Section(palette, storage)`，
+  索引公式同 `PalettedContainer.getIndex` = `(y<<8)|(z<<4)|x`。
+- core：`mixin/PalettedContainerAccessor`（`@Mixin(PalettedContainer.class)` + `@Accessor`，已在 `numen.mixins.json` 登记）。
+- **调色板共享不拷**是安全的：源容器对调色板只**追加**（`idFor`）或溢出时**整体换字段**（`onResize`），
+  从不就地重排既有索引；快照拷的是那一刻的位存储 + 那一刻的调色板对象，之后源再改不影响已拷下的索引。
+
+**真机前后**（MSLX test1.16.5）：拷快照 **p50 147.8ms → 1.9ms（~55×）**，p95 157.7 → 8.8，占比 99% → 16%。
+残留的单刻总计 ~9ms 来自转向/成本模型，不是拷贝。（只改了 pathing + 一个 mixin，无 API/行为变化。）

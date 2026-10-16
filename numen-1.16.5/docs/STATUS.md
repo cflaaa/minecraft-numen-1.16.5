@@ -19,6 +19,10 @@
 - **新发现并修**（本提交）：`Companions.spawn` 绕过 `CompanionRegistry`（上游只有入册的 `summon`）→
   从 MCP/`/numen summon`/面板服务出来的同伴**不落盘、不复活、不上花名册**。
   改成委托给 `summon`；真机复验：`/kill Alice` → 5s 后 `Alice joined the game`（×2），名册可见。
+- **0003 主线程寻路（拷快照）**：真机量化定位——`PalettedContainer.write` 把 4096 格逐格重打包，占拷贝 99%。
+  改用 core 的 `PalettedContainerAccessor` mixin 取 `storage/palette/bits`，拷 raw `long[]`（调色板共享）。
+  真机前后：**拷快照 p50 147.8ms → 1.9ms（~55×），占比 99% → 16%**；服务端不崩。
+  残留：单刻总计 p50 ~9ms 来自转向/成本模型（非拷贝）；冷启动首搜有 150ms 离群（JIT）。
 
 ---
 
