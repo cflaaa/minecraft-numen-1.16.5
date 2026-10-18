@@ -20,6 +20,8 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 
+import javax.annotation.Nullable;
+
 import java.util.UUID;
 
 /**
@@ -446,6 +448,70 @@ public final class NumenPlayer extends ServerPlayer implements Body {
         return fakeClient;
     }
 
+    // ─────────── 跨维度传送的延迟执行（#0008，见 ServerPlayerChangeDimensionMixin）───────────
+
+    /**
+     * 实体刻内被 mixin 拦下、待执行的跨维度传送目标；null = 没有。
+     *
+     * <p>原版 {@code handleNetherPortal → changeDimension} 在实体刻内会 {@code removePlayer}
+     * （撞原版保护，见 #0008），所以 mixin 在 HEAD 拦下只登记这里，由 {@code Companions.tick}
+     * （END_SERVER_TICK，实体刻已结束）补执行。
+     */
+    @Nullable
+    public ServerLevel numen$pendingDimension;
+
+    /** true = 正在实体刻之外补执行真实的 {@code changeDimension}（mixin 据此放行，防无限递归）。 */
+    public boolean numen$deferredChangeRunning;
+
+    /** mixin 拦下的传送先排队（幂等：已登记就不覆盖——同一次站门只需要一次）。 */
+    public void numen$queueDimensionChange(ServerLevel dest) {
+        if (numen$pendingDimension == null) {
+            numen$pendingDimension = dest;
+        }
+    }
+
+    /**
+     * 站在激活下界门里的补检（#0008 触发链缺口）。
+     *
+     * <p>原版「在门里」的标记只由 {@code Entity.checkInsideBlocks()} 置位，而它唯一的调用点是
+     * {@code Entity.move()}——有位移才会走到；同伴站着不动时 {@code Physics.step} 的位移为零，
+     * {@code move()} 早退，标记无法维持，80 tick 的传送计时永远凑不满，站在门里永远不传。
+     * 这里按原版语义补上：调 {@code handleInsidePortal}（冷却中会续期防弹回；不在冷却则置
+     * {@code isInsidePortal}），随后 {@code baseTick} 里的 {@code handleNetherPortal} 正常计数，
+     * 到点 {@code changeDimension}（由 mixin 拦下延迟执行）。
+     */
+    private void numen$tickInsidePortal() {
+        if (this.level().isClientSide || !this.isAlive()) {
+            return;
+        }
+        if (this.isOnPortalCooldown()) {
+            // 冷却中：绝对不能调 handleInsidePortal——它开头会 setPortalCooldown() 续回 10，
+            // 而递减每刻只 -1，冷却被永远钉住 → 死锁（本轮实测就是这个现象）。
+            // 这里什么都不做，交给原版 processPortalCooldown 每刻递减，归零后自然恢复触发。
+            return;
+        }
+        BlockPos at = this.blockPosition();
+        if (this.level().getBlockState(at).is(net.minecraft.world.level.block.Blocks.NETHER_PORTAL)) {
+            if (!numen$portalPatchLogged) {
+                numen$portalPatchLogged = true;
+                Constants.info("[numen-portal] {} 站在激活门里，触发链补丁生效（补版 #0008）", getName().getString());
+            }
+            // 绕过 handleInsidePortal 的续冷却分支，直接置标记（protected，子类可写）：
+            // baseTick 里的 handleNetherPortal 随后 portalTime++，累计到 getPortalWaitTime() 就触发。
+            this.isInsidePortal = true;
+            if (++numen$diagTick % 100 == 0) {
+                Constants.info("[numen-portal] diag: isInsidePortal={}, portalTime={}, onCooldown={}, wait={}，at={}",
+                        this.isInsidePortal, this.portalTime, this.isOnPortalCooldown(),
+                        this.getPortalWaitTime(), at);
+            }
+        }
+    }
+
+    /** 补丁自检：只打一次，证明触发链补丁真的在 tick 里运行（#0008 排障用）。 */
+    private boolean numen$portalPatchLogged;
+    /** 诊断计数器（每 100 tick 打一次内部状态）。 */
+    private int numen$diagTick;
+
     // ─────────── 用坏的装备（上游 NumenPlayer 的同一段，BodyDelta 要）───────────
 
     /** 一件在她身上用坏的装备：是什么、坏在哪个装备位。 */
@@ -521,6 +587,14 @@ public final class NumenPlayer extends ServerPlayer implements Body {
             } catch (RuntimeException ex) {
                 reportTickFailure(ex);
             }
+        }
+
+        // 补触发链（#0008）：同伴站定在激活门里时 move() 早退、原版标记置不上，
+        // 这里按原版语义补上「在门里」，baseTick 的 handleNetherPortal 才能计数到点。
+        try {
+            numen$tickInsidePortal();
+        } catch (RuntimeException ex) {
+            reportTickFailure(ex);
         }
     }
 

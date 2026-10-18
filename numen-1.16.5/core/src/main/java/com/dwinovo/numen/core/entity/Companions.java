@@ -285,6 +285,8 @@ public final class Companions {
             serverRestorePending = false;
             respawnAllServerOwned(server);
         }
+        // 被拦下的跨维度传送：在实体刻之外补执行（#0008，与 drainPendingDespawns 同一理由）。
+        drainPendingDimensionChanges(server);
         // 先收尸：这一刻之前死掉的，趁实体刻已结束移出世界（见 PENDING_DESPAWN）。
         drainPendingDespawns(server);
         if (BRAINS.isEmpty()) {
@@ -297,6 +299,35 @@ public final class Companions {
             } catch (RuntimeException ex) {
                 // 一只同伴的大脑炸了不能连累别人，更不能掀掉服务端主循环。
                 Constants.error("同伴 {} 的大脑 tick 抛了异常，跳过这一步", brain.name(), ex);
+            }
+        }
+    }
+
+    /**
+     * 把同伴在实体刻内被拦下的跨维度传送补执行（#0008）。
+     *
+     * <p>挂在 {@link #tick}（END_SERVER_TICK）里，此刻实体刻已全部结束——原版
+     * {@code changeDimension → ServerLevel.removePlayer} 在这里合法（真人玩家的同一条路径
+     * 本来就跑在实体刻之外）。执行后补一发 {@code setPortalCooldown()}：原版这条路径不显式设冷却，
+     * 不补的话她在下界落点的新门里可能立刻被弹回。
+     */
+    private static void drainPendingDimensionChanges(MinecraftServer server) {
+        for (ServerPlayer p : server.getPlayerList().getPlayers()) {
+            if (!(p instanceof NumenPlayer companion)) continue;
+            ServerLevel dest = companion.numen$pendingDimension;
+            if (dest == null) continue;
+            companion.numen$pendingDimension = null;
+            companion.numen$deferredChangeRunning = true;
+            try {
+                companion.changeDimension(dest);
+                companion.setPortalCooldown();
+                Constants.info("[numen-portal] {} 已延迟传送 → {}", companion.getName().getString(),
+                        dest.dimension().location());
+            } catch (RuntimeException ex) {
+                Constants.error("[numen-portal] {} 延迟传送失败（去 {}）", companion.getName().getString(),
+                        dest.dimension().location(), ex);
+            } finally {
+                companion.numen$deferredChangeRunning = false;
             }
         }
     }

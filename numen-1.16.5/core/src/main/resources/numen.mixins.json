@@ -19,6 +19,7 @@
         "PalettedContainerAccessor",
         "ServerboundAcceptTeleportationPacketAccessor",
         "ServerLevelBlockChangeMixin",
+        "ServerPlayerChangeDimensionMixin",
         "SlotAccessor"
     ],
     "client": [
