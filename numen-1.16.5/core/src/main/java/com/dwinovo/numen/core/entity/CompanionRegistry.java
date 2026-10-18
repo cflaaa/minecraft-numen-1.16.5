@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -44,12 +45,12 @@ public final class CompanionRegistry extends SavedData {
      *  state is persisted here so it SURVIVES a logout during the respawn window — see Companions).
      *  {@code skinValue}/{@code skinSig} = 借来的正版皮肤(Mojang 签名的 textures 属性),
      *  空串 = 无皮肤,客户端回落原版默认皮肤(按 UUID 哈希抽取)。 */
-    public record Entry(String name, UUID owner, ResourceKey<Level> dimension, BlockPos pos,
+    public record Entry(String name, Optional<UUID> owner, ResourceKey<Level> dimension, BlockPos pos,
                         String deathCause, long diedAt, String skinValue, String skinSig,
                         String taskName, String taskLua, String taskOld) {
-        /** A live companion (not dead), no borrowed skin, idle. */
+        /** A live companion (not dead), no borrowed skin, idle. {@code owner} 为 null = 服务器同伴(无主)。 */
         public Entry(String name, UUID owner, ResourceKey<Level> dimension, BlockPos pos) {
-            this(name, owner, dimension, pos, "", 0L, "", "", "", "", "");
+            this(name, Optional.ofNullable(owner), dimension, pos, "", 0L, "", "", "", "", "");
         }
 
         /**
@@ -85,7 +86,7 @@ public final class CompanionRegistry extends SavedData {
 
         static final Codec<Entry> CODEC = RecordCodecBuilder.create(i -> i.group(
                 Codec.STRING.fieldOf("name").forGetter(Entry::name),
-                UUID_STRING.fieldOf("owner").forGetter(Entry::owner),
+                UUID_STRING.optionalFieldOf("owner").forGetter(Entry::owner),
                 DIMENSION.fieldOf("dimension").forGetter(Entry::dimension),
                 BlockPos.CODEC.fieldOf("pos").forGetter(Entry::pos),
                 Codec.STRING.optionalFieldOf("deathCause", "").forGetter(Entry::deathCause),
@@ -183,11 +184,21 @@ public final class CompanionRegistry extends SavedData {
         if (entries.remove(companionUuid) != null) setDirty();
     }
 
-    /** Every companion owned by {@code ownerUuid} (UUID + entry). */
+    /** Every companion owned by {@code ownerUuid} (UUID + entry). {@code ownerUuid} 为 null 时返回无主者。 */
     public List<Map.Entry<UUID, Entry>> ownedBy(UUID ownerUuid) {
         List<Map.Entry<UUID, Entry>> out = new ArrayList<>();
         for (Map.Entry<UUID, Entry> e : entries.entrySet()) {
-            if (e.getValue().owner().equals(ownerUuid)) out.add(e);
+            UUID o = e.getValue().owner().orElse(null);
+            if (o == null ? ownerUuid == null : o.equals(ownerUuid)) out.add(e);
+        }
+        return out;
+    }
+
+    /** Every companion with no owner——服务器同伴。开服入驻用。 */
+    public List<Map.Entry<UUID, Entry>> serverOwned() {
+        List<Map.Entry<UUID, Entry>> out = new ArrayList<>();
+        for (Map.Entry<UUID, Entry> e : entries.entrySet()) {
+            if (e.getValue().owner().isEmpty()) out.add(e);
         }
         return out;
     }

@@ -64,7 +64,7 @@ public record LocateNumenPayload(List<UUID> entityUuids) implements NumenPayload
             // it sleeps instead of a useless "offline". Owner-gated — the registry
             // carries ownership and the respawn-hint position.
             CompanionRegistry.Entry entry = registry.find(uuid);
-            if (numen == null && entry != null && entry.owner().equals(player.getUUID())) {
+            if (numen == null && entry != null && player.getUUID().equals(entry.owner().orElse(null))) {
                 var pos = entry.pos();
                 out.add(NumenLocationsPayload.Snapshot.lastSeen(uuid,
                         pos.getX(), pos.getY(), pos.getZ(),

@@ -37,27 +37,32 @@ public final class Permission {
         return gateFor(companion).judgeLive(action, (ServerLevel) companion.getLevel());
     }
 
-    /** 这只同伴的模式;还没有主人时按 {@link Mode#ASK}。 */
+    /** 这只同伴的模式;无主人(服务器同伴)走服务器档、默认 {@link Mode#AUTO}。 */
     public static Mode modeOf(NumenPlayer companion) {
         UUID owner = companion.getOwnerUuid();
         if (owner == null) {
-            return Mode.ASK;
+            return PermissionStore.ofServer(companion.getServer())
+                    .modeOrDefault(companion.getUUID(), Mode.AUTO);
         }
         return PermissionStore.of(companion.getServer(), owner).modeOf(companion.getUUID());
     }
 
-    /** 主人给这只同伴设模式(面板与命令的落点);还没有主人时不存。 */
+    /** 给这只同伴设模式(面板与命令的落点);无主人时存进服务器档。 */
     public static void setMode(NumenPlayer companion, Mode mode) {
         UUID owner = companion.getOwnerUuid();
         if (owner == null) {
+            PermissionStore.ofServer(companion.getServer()).setMode(companion.getUUID(), mode);
             return;
         }
         PermissionStore.of(companion.getServer(), owner).setMode(companion.getUUID(), mode);
     }
 
-    /** 这只同伴的主人写的那一层规则;还没有主人时是空层。 */
+    /** 这只同伴的上层规则;无主人时用服务器档的规则层。 */
     private static RuleSet ownerRules(NumenPlayer companion) {
         UUID owner = companion.getOwnerUuid();
-        return owner == null ? RuleSet.EMPTY : PermissionStore.of(companion.getServer(), owner).rules();
+        if (owner == null) {
+            return PermissionStore.ofServer(companion.getServer()).rules();
+        }
+        return PermissionStore.of(companion.getServer(), owner).rules();
     }
 }

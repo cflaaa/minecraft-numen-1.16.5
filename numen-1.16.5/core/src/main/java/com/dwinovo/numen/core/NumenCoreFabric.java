@@ -179,6 +179,8 @@ public final class NumenCoreFabric implements ModInitializer {
         ServerLifecycleEvents.SERVER_STARTED.register(server -> {
             ToolRunner.bind(server);
             McpActuator.bind(server);
+            // 开服入驻:把服务器同伴(无主)放回世界,不等任何玩家登录。
+            Companions.scheduleServerRestore();
             String missing = NumenConfig.get().missingReason();
             if (missing == null) {
                 Constants.info("端点已就绪：{} / {}", NumenConfig.get().provider, NumenConfig.get().model);

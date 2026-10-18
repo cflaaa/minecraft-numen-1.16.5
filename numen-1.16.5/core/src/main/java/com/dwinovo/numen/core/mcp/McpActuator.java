@@ -97,9 +97,9 @@ public final class McpActuator {
         }
         return hop(false, s -> {
             ServerPlayer owner = Companions.firstOwner(s);
+            // 没有玩家在场 → 召唤成"服务器同伴"（无主），不依赖玩家。
             if (owner == null) {
-                Constants.warn("[numen-mcp] 召唤 {} 失败：世界里没有玩家可以当主人", n);
-                return false;
+                return Companions.summonServer(s, n) != null;
             }
             return Companions.spawn(s, owner, n) != null;
         });

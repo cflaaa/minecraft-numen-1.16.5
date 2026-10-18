@@ -61,6 +61,13 @@ public final class Companions {
     private static final java.util.Set<UUID> PENDING_DESPAWN =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
 
+    /** 开服:下一个服务器刻把**服务器同伴**(无主)放回世界。此刻世界刚就绪,照 JOIN 的同款推迟一拍。 */
+    private static volatile boolean serverRestorePending;
+
+    public static void scheduleServerRestore() {
+        serverRestorePending = true;
+    }
+
     /**
      * 同伴 UUID → 主人 UUID。
      *
@@ -259,10 +266,25 @@ public final class Companions {
         return null;
     }
 
+    /**
+     * 召唤一只**服务器同伴**（无主）：落在主世界出生点。控制台 / MCP 用，不要求任何玩家在场。
+     * 无主同伴的权限模式默认 {@code AUTO}（自动同意、deny 仍生效）。
+     */
+    public static NumenPlayer summonServer(MinecraftServer server, String name) {
+        ServerLevel overworld = server.overworld();
+        BlockPos sp = overworld.getSharedSpawnPos();
+        return summon(server, /*owner=*/null, name, overworld,
+                new Vec3(sp.getX() + 0.5, sp.getY(), sp.getZ() + 0.5));
+    }
+
     // ---- 每刻驱动 ----
 
     /** 服务端每刻调一次：让每只同伴的大脑往前走一步。 */
     public static void tick(MinecraftServer server) {
+        if (serverRestorePending) {
+            serverRestorePending = false;
+            respawnAllServerOwned(server);
+        }
         // 先收尸：这一刻之前死掉的，趁实体刻已结束移出世界（见 PENDING_DESPAWN）。
         drainPendingDespawns(server);
         if (BRAINS.isEmpty()) {
@@ -393,7 +415,7 @@ public final class Companions {
         if (level == null) {
             level = server.overworld();
         }
-        NumenPlayer body = CompanionFactory.spawn(server, level, entry.owner(), entry.name());
+        NumenPlayer body = CompanionFactory.spawn(server, level, entry.owner().orElse(null), entry.name());
         // 注册表里记着的那一格：身体刚从 .dat 读回位置，这里把「名册说她在哪」对齐一次。
         BlockPos at = entry.pos();
         if (at != null) {
@@ -468,6 +490,19 @@ public final class Companions {
         }
         if (owner != null) {
             replayOutbox(server, ownerUuid, owner);
+        }
+    }
+
+    /** 开服：把注册表里所有**服务器同伴**（无主）放回世界。不依赖任何玩家登录。逐只隔离。 */
+    public static void respawnAllServerOwned(MinecraftServer server) {
+        for (Map.Entry<UUID, CompanionRegistry.Entry> e : CompanionRegistry.get(server).serverOwned()) {
+            try {
+                if (NumenPlayer.findByUuid(server, e.getKey()) == null) {
+                    respawn(server, e.getKey());
+                }
+            } catch (RuntimeException ex) {
+                Constants.error("服务器同伴 {} 没能回到世界里，跳过", e.getKey(), ex);
+            }
         }
     }
 
@@ -625,7 +660,12 @@ public final class Companions {
             if (now - entry.diedAt() < RESPAWN_DELAY_TICKS) {
                 continue;
             }
-            ServerPlayer owner = server.getPlayerList().getPlayer(entry.owner());
+            // 服务器同伴(无主):不等人,直接在床/家复活。
+            if (entry.owner().isEmpty()) {
+                respawnServerDead(server, e.getKey(), entry);
+                continue;
+            }
+            ServerPlayer owner = server.getPlayerList().getPlayer(entry.owner().orElse(null));
             if (owner == null) {
                 continue;   // 主人不在线——等他登录
             }
@@ -649,7 +689,7 @@ public final class Companions {
         if (pos == null) {
             return false;
         }
-        NumenPlayer body = CompanionFactory.spawn(server, level, entry.owner(), entry.name());
+        NumenPlayer body = CompanionFactory.spawn(server, level, entry.owner().orElse(null), entry.name());
         body.teleportTo(pos.x, pos.y, pos.z);
         body.setHealth(body.getMaxHealth());
         body.clearFire();
@@ -658,6 +698,32 @@ public final class Companions {
         syncRosterToOwner(server, owner);
         NumenNetwork.sendToPlayer(owner, new NumenRespawnPayload(uuid, entry.deathCause()));
         return true;
+    }
+
+    /**
+     * 把一只死掉的**服务器同伴**(无主)放回世界:优先回她用床设下的原版复活点(同维度时),
+     * 没有就用名册里的落点(家/最后位置)。全程不依赖任何玩家在场。
+     */
+    private static void respawnServerDead(MinecraftServer server, UUID uuid, CompanionRegistry.Entry entry) {
+        ServerLevel level = server.getLevel(entry.dimension());
+        if (level == null) {
+            level = server.overworld();
+        }
+        NumenPlayer body = CompanionFactory.spawn(server, level, entry.owner().orElse(null), entry.name());
+        body.setHealth(body.getMaxHealth());
+        body.clearFire();
+        // 睡过床 → 身体的 .dat 里带着原版复活点;维度一致就用它,否则用名册落点。
+        BlockPos at = entry.pos();
+        BlockPos bed = body.getRespawnPosition();
+        if (bed != null && body.getRespawnDimension() != null
+                && body.getRespawnDimension().equals(level.dimension())) {
+            at = bed;
+        }
+        if (at != null) {
+            body.teleportTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+        }
+        BRAINS.put(body.getUUID(), new CompanionBrain(body));
+        CompanionRegistry.get(server).markAlive(uuid);
     }
 
     /**

@@ -69,6 +69,14 @@ public final class NumenCommand {
                 .then(Commands.literal("dismiss")
                         .then(Commands.argument("name", StringArgumentType.word())
                                 .executes(ctx -> dismiss(ctx, StringArgumentType.getString(ctx, "name")))))
+                // 服务器同伴(无主):本来就不需要玩家。控制台可直接调。
+                .then(Commands.literal("server")
+                        .then(Commands.literal("summon")
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(ctx -> serverSummon(ctx, StringArgumentType.getString(ctx, "name")))))
+                        .then(Commands.literal("dismiss")
+                                .then(Commands.argument("name", StringArgumentType.word())
+                                        .executes(ctx -> dismiss(ctx, StringArgumentType.getString(ctx, "name"))))))
                 .then(Commands.literal("list")
                         .executes(NumenCommand::list))
                 .then(Commands.literal("tell")
@@ -345,6 +353,28 @@ public final class NumenCommand {
         }
         fail(ctx, "没有叫 " + name + " 的同伴");
         return 0;
+    }
+
+    /** {@code /numen server summon <名字>}：召唤一只无主的服务器同伴，不要求命令源是玩家。 */
+    private static int serverSummon(CommandContext<CommandSourceStack> ctx, String name)
+            throws CommandSyntaxException {
+        if (!NAME.matcher(name).matches()) {
+            fail(ctx, "名字要 3~16 位，只能用字母、数字、下划线");
+            return 0;
+        }
+        MinecraftServer server = ctx.getSource().getServer();
+        if (Companions.findByName(server, name) != null) {
+            fail(ctx, "已经有一只叫 " + name + " 的同伴了");
+            return 0;
+        }
+        NumenPlayer body = Companions.summonServer(server, name);
+        if (body == null) {
+            fail(ctx, "召唤失败");
+            return 0;
+        }
+        ctx.getSource().sendSuccess(new TextComponent(
+                "召唤了服务器同伴 " + name + "（无主，权限默认 AUTO）"), false);
+        return 1;
     }
 
     private static int list(CommandContext<CommandSourceStack> ctx) {

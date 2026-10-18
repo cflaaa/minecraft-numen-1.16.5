@@ -48,7 +48,7 @@ public record DismissRequestPayload(UUID uuid) implements NumenPayload {
             callers = body.isOwnedByPlayer(owner.getUUID());
         } else {
             CompanionRegistry.Entry e = CompanionRegistry.get(server).find(p.uuid());
-            callers = e != null && e.owner().equals(owner.getUUID());
+            callers = e != null && owner.getUUID().equals(e.owner().orElse(null));
         }
         if (!callers) return;
         Companions.dismiss(server, owner.getUUID(), List.of(p.uuid()));

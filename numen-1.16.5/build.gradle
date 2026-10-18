@@ -3,6 +3,12 @@
 
 subprojects {
     repositories {
+        // 官方 Mojang 库优先（brigadier/datafixerupper/authlib/text2speech…）：阿里云没有、BMCLAPI 会 302 到超时 CDN，
+        // 而 libraries.minecraft.net 直连可达。放最前，免得被镜像的坏链路挡住。
+        maven {
+            name = 'Mojang'
+            url = uri('https://libraries.minecraft.net')
+        }
         // 镜像优先，理由见 README「构建」一节。
         // 顺序讲究：Fabric/loom 自己的插件对（accesswidener 等）只有 maven.fabricmc.net 有，
         // 但它被 Cloudflare 拦，必须让阿里云先接住所有 *公共* 制品，剩下的再落回来。
@@ -17,11 +23,6 @@ subprojects {
         maven {
             name = 'Fabric'
             url = uri('https://maven.fabricmc.net')
-        }
-        // 1.16.5 的 Minecraft 依赖（brigadier、datafixerupper、authlib……）在这里。
-        maven {
-            name = 'Mojang'
-            url = uri('https://libraries.minecraft.net')
         }
         mavenCentral()
     }

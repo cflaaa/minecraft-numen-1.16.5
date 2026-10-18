@@ -127,7 +127,8 @@ public final class CompanionTickDispatcher {
                 UUID owner = ap.getOwnerUuid();
                 net.minecraft.server.level.ServerPlayer ownerPlayer =
                         owner == null ? null : server.getPlayerList().getPlayer(owner);
-                if (ownerPlayer != null) {
+                // 无主(服务器同伴)不靠主人:主人不在线也保持区块加载,否则它会冻结。
+                if (ownerPlayer != null || owner == null) {
                     CompanionChunkLoader.refresh(ap);
                 }
                 // 背包变了就推给主人一份。变化由原版的 ContainerListener 报,这里每 tick

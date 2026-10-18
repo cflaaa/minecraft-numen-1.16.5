@@ -92,6 +92,16 @@ public final class Gate {
         if (mode == Mode.OBSERVE) {
             return Verdict.deny("observe mode: " + action.kind().verb() + " would change the world");
         }
+        if (mode == Mode.AUTO) {
+            // 服务器同伴:deny 行仍然生效(保护别人的建筑/危险动作),其余一律放行——不再需要主人点头。
+            for (RuleSet layer : layers) {
+                Rule denied = RuleSet.firstMatch(layer.deny(), action, facts);
+                if (denied != null) {
+                    return Verdict.deny("denied by rule " + denied + " (" + denied.describe() + ")");
+                }
+            }
+            return Verdict.allow();
+        }
         Rule hit = null;
         for (RuleSet layer : layers) {
             Rule denied = RuleSet.firstMatch(layer.deny(), action, facts);

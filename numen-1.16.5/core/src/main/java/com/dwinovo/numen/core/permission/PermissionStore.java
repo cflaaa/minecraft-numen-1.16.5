@@ -70,6 +70,11 @@ public final class PermissionStore extends SavedData {
         super("numen_permissions_test");
     }
 
+    /** 指定存档文件名的构造(服务器档用)。 */
+    private PermissionStore(String dataFileName) {
+        super(dataFileName);
+    }
+
     private PermissionStore(Map<UUID, String> modeNames, List<Rule> deny, List<Rule> ask, List<Rule> allow) {
         this(new UUID(0L, 0L));
         modeNames.forEach((uuid, name) -> modes.put(uuid, Mode.byName(name)));
@@ -112,6 +117,14 @@ public final class PermissionStore extends SavedData {
         return server.overworld().getDataStorage().computeIfAbsent(() -> new PermissionStore(owner), fileName(owner));
     }
 
+    /** 服务器同伴(无主)共用的权限档:固定一个文件,不按 owner 分。 */
+    public static final String SERVER_FILE = "numen_permissions_server";
+
+    public static PermissionStore ofServer(MinecraftServer server) {
+        return server.overworld().getDataStorage()
+                .computeIfAbsent(() -> new PermissionStore(SERVER_FILE), SERVER_FILE);
+    }
+
     @Override
     public CompoundTag save(CompoundTag tag) {
         CODEC.encodeStart(NbtOps.INSTANCE, this).result()
@@ -122,6 +135,11 @@ public final class PermissionStore extends SavedData {
     /** 这只同伴的模式;没设过是 {@link Mode#ASK}。 */
     public Mode modeOf(UUID companion) {
         return modes.getOrDefault(companion, Mode.ASK);
+    }
+
+    /** 这只同伴的模式;没设过给 {@code fallback}(服务器档用 {@link Mode#AUTO})。 */
+    public Mode modeOrDefault(UUID companion, Mode fallback) {
+        return modes.getOrDefault(companion, fallback);
     }
 
     public void setMode(UUID companion, Mode mode) {

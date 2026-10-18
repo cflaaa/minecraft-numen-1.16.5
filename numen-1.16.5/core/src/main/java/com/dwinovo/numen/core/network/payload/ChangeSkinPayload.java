@@ -50,7 +50,7 @@ public record ChangeSkinPayload(UUID uuid, String skinValue, String skinSig)
         if (server == null || p.uuid() == null) return;
         CompanionRegistry reg = CompanionRegistry.get(server);
         CompanionRegistry.Entry entry = reg.find(p.uuid());
-        if (entry == null || !owner.getUUID().equals(entry.owner())) {
+        if (entry == null || !owner.getUUID().equals(entry.owner().orElse(null))) {
             return;   // 不存在或不是他的
         }
         reg.put(p.uuid(), entry.withSkin(p.skinValue(), p.skinSig()));
