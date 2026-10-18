@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSource;
+import net.minecraft.world.level.levelgen.feature.StructureFeature;
 
 import java.util.LinkedHashSet;
 import java.util.function.Predicate;
@@ -139,8 +140,9 @@ public final class LocateBiomeCompanionTask extends AbstractCompanionTask<Locate
         }
         Registry<Biome> biomes = sl.registryAccess().registryOrThrow(Registry.BIOME_REGISTRY);
         if (biomes.getOptional(id).isEmpty()) {
-            Registry<?> structures =
-                    sl.registryAccess().registryOrThrow(Registry.STRUCTURE_FEATURE_REGISTRY);
+            // 1.16.5: structure_feature 是静态注册表(Registry.STRUCTURE_FEATURE 本体),
+            // 不在 registryAccess 里——registryOrThrow 会炸,与 LocateStructureCompanionTask 同一结论。
+            Registry<StructureFeature<?>> structures = Registry.STRUCTURE_FEATURE;
             if (structures.getOptional(id).isPresent()) {
                 failReason = arg + " is a STRUCTURE, not a biome — use locate structure " + arg + " instead";
                 return null;

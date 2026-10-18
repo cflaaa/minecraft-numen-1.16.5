@@ -202,8 +202,10 @@ public final class LocateStructureCompanionTask extends AbstractCompanionTask<Lo
                     + " — use a structure id like minecraft:fortress / minecraft:village";
             return null;
         }
-        Registry<StructureFeature<?>> structures =
-                sl.registryAccess().registryOrThrow(Registry.STRUCTURE_FEATURE_REGISTRY);
+        // 1.16.5: structure_feature 是**静态**注册表(Registry.STRUCTURE_FEATURE 本体),
+        // 不在 registryAccess 的动态注册表里——走 registryOrThrow 会炸 Missing registry
+        // (与 StatusApi.self 同一结论,见那边注释)。
+        Registry<StructureFeature<?>> structures = Registry.STRUCTURE_FEATURE;
         StructureFeature<?> feature = structures.getOptional(id).orElse(null);
         if (feature != null) {
             return feature;
