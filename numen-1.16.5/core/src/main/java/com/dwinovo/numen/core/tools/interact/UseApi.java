@@ -70,6 +70,18 @@ public final class UseApi {
             + "clicked, and the result says so and names the next step. It never moves, never swaps tools, never "
             + "clears the way.")
     @Note("Placing near your owner's things may ask your owner first; the call waits for the answer.")
+    @Note("Relighting an extinguished nether portal: the obsidian frame stays, the purple portal cells are "
+            + "gone. Aim at a SOLID face of the frame — the top of a bottom obsidian, from beside the frame at "
+            + "the same level — not at the air cell between (flint and steel clicks a solid face, air does "
+            + "nothing). Stand where the face is in sight: the crosshair decides what gets clicked, so if it "
+            + "lands on a block behind you or a nylium in the way, that is what the click hits — the result "
+            + "names the block it landed on, use that to reposition.")
+    @Note("Crossing a portal needs your BODY INSIDE a portal cell, not beside it: route with "
+            + "arrive = \"at\" onto the cell itself (numen.move.to({x = the portal cell}, {arrive = \"at\"})), "
+            + "and give the portal cooldown a moment (PortalCooldown must be 0, and it only ticks down when "
+            + "nobody re-arms it by standing in the portal while it is running). Diagnose a silent portal: "
+            + "scan.blocks(\"minecraft:obsidian\") finds the frame, scan.blocks(\"minecraft:nether_portal\") "
+            + "finds the lit cells — frame without cells means it needs relighting with flint and steel.")
     @Note("Otherwise the result reports what actually changed (your inventory and experience, health, riding, the aimed block, new entities); no change "
             + "listed means the click did nothing.")
     @SeeAlso({"numen.gui.view", "numen.use.hit", "numen.use.entity"})

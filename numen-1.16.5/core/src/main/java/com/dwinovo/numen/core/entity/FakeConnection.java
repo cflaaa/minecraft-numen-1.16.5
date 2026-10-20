@@ -52,6 +52,29 @@ public final class FakeConnection extends Connection {
             new InetSocketAddress(InetAddress.getLoopbackAddress(), 0);
 
     /**
+     * 出站包的观察者：同伴侧的 {@link FakeClient}（在 {@code placeNewPlayer} 之后由
+     * {@code CompanionFactory.spawn} 接上）。null = 尚未接上（构造期）。
+     *
+     * <p><b>为什么必须有它（#0008 回程钉死/E11 的根因）：</b>
+     * 服务端每次 {@code connection.teleport()} 都会发一个 {@code ClientboundPlayerPositionPacket}
+     * （内含自增 id）给“客户端”，等它回 {@code ServerboundAcceptTeleportationPacket}。
+     * {@code handleAcceptTeleportPacket} 是 <b>唯一</b>调 {@code hasChangedDimension()} 的地方
+     * （全 jar 仅 ServerGamePacketListenerImpl 一处），而它是唯一把 {@code isChangingDimension}
+     * 置回 false 的地方。假玩家没有客户端，这个包原本在 {@code send()} 里直接丢掉 →
+     * 回执永远不来 → {@code isChangingDimension} 永远 true →
+     * {@code ServerPlayer.processPortalCooldown} 的 {@code if (!isChangingDimension)} 分支
+     * 永远跳过递减 → 传送门冷却钉死在 10（实测就是 E11 现象）。
+     * 把包递给 {@link FakeClient} 观察后，它记下 teleport id，下一刻 {@code answer()} 代答回执，
+     * 链路就通了。发不出去的包照样丢（对面没有真客户端，见下），只是先看一眼。
+     */
+    private java.util.function.Consumer<Packet<?>> numen$outboundObserver;
+
+    /** 接上观察者（placeNewPlayer 之后，CompanionFactory.spawn 里调）。 */
+    public void numen$observeWith(java.util.function.Consumer<Packet<?>> observer) {
+        this.numen$outboundObserver = observer;
+    }
+
+    /**
      * 回环地址。<b>不是装饰，是兼容性要求。</b>
      *
      * <p>内存通道的远端地址是 netty 自己的类型，而生态里大量代码把 {@code SocketAddress}
@@ -84,12 +107,21 @@ public final class FakeConnection extends Connection {
      */
     @Override
     public void send(Packet<?> packet) {
-        // 故意空实现：没有通道，也就不会有 pendingActions 增长。
+        // 出站包先递给观察者（FakeClient 记下要回执的 teleport id），再丢掉。
+        // 观察者抛异常不拦发送路径：回执链路坏了也不能让服务端主循环跟着炸。
+        if (numen$outboundObserver != null) {
+            try {
+                numen$outboundObserver.accept(packet);
+            } catch (RuntimeException ignored) {
+            }
+        }
+        // 故意不实际发送：没有通道，也就不会有 pendingActions 增长。
     }
 
     @Override
     public void send(Packet<?> packet, GenericFutureListener<? extends Future<? super Void>> listener) {
-        // 故意空实现：同上。
+        // 同 send(Packet)：先观察，再丢。
+        send(packet);
     }
 
     /**

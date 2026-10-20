@@ -58,6 +58,13 @@ public final class CompanionFactory {
         // 这具身体的 connection 上——所以 connection 不是我们自己设的。
         server.getPlayerList().placeNewPlayer(new FakeConnection(), body);
 
+        // 出站包接上 FakeClient（#0008 回程钉死的根因修复，见 FakeConnection 的注释）:
+        // placeNewPlayer 建好了 body.connection，这里把包观察者接上，让 accept-teleport
+        // 回执链路真正接通——否则 isChangingDimension 永远不清、传送门冷却钉死。
+        if (body.connection != null && body.connection.getConnection() instanceof FakeConnection fake) {
+            fake.numen$observeWith(body.fakeClient()::onOutbound);
+        }
+
         // 皮肤覆盖层是同步实体数据、不随存档存取，每次进世界都要重设。
         body.showAllSkinLayers();
         // 身体齐了、进了玩家列表，插件此刻可以对它下命令（改外观、发指令都需要它在列表里）。
