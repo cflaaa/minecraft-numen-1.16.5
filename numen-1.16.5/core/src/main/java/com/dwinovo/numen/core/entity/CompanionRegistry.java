@@ -220,6 +220,19 @@ public final class CompanionRegistry extends SavedData {
         setDirty();
     }
 
+    /**
+     * Mark a companion dead <b>and remember where she fell</b>——无主同伴复活时就回这一格（「原地复活」）。
+     *
+     * <p>这是 #0015 的「死亡时回写」修法：名册落点平时只在召唤/休眠时刷新，于是死一次就回召唤点；
+     * 这里把死亡处写进去，复活（{@code respawnServerDead}）便按它回来。
+     */
+    public void markDeadAt(UUID uuid, String cause, long diedAt, ResourceKey<Level> dimension, BlockPos pos) {
+        Entry e = entries.get(uuid);
+        if (e == null) return;
+        entries.put(uuid, e.movedTo(dimension, pos).dead(cause, diedAt));
+        setDirty();
+    }
+
     /** Clear the death state (called when the body is respawned). */
     public void markAlive(UUID uuid) {
         Entry e = entries.get(uuid);

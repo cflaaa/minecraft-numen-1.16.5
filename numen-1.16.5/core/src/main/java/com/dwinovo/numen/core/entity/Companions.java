@@ -393,7 +393,9 @@ public final class Companions {
         }
         // 把死亡（死因 + 游戏时刻）落进世界存档的注册表：撑得过复活窗口里的一次登出——
         // 没有它，重登就丢了待复活状态，身体会「活着」回来，背包空空，也不知道自己死过。
-        CompanionRegistry.get(server).markDead(uuid, cause, server.overworld().getGameTime());
+        // 原地复活（#0015 修法）：把死亡处写进名册落点，无主同伴复活时就回这一格，而不是召唤点。
+        CompanionRegistry.get(server).markDeadAt(uuid, cause, server.overworld().getGameTime(),
+                ((ServerLevel) body.level).dimension(), body.blockPosition());
         // 死亡状态进了注册表，名册才说得出「她还在，只是躺着」——面板的倒计时读这个。
         // 少了这一推，主人在死亡窗口里重登就会看见她凭空消失。
         if (owner != null) {
@@ -450,7 +452,7 @@ public final class Companions {
         // 注册表里记着的那一格：身体刚从 .dat 读回位置，这里把「名册说她在哪」对齐一次。
         BlockPos at = entry.pos();
         if (at != null) {
-            body.teleportTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+            placeAt(body, level, at);
         }
         BRAINS.put(body.getUUID(), new CompanionBrain(body));
         return body;
@@ -751,10 +753,27 @@ public final class Companions {
             at = bed;
         }
         if (at != null) {
-            body.teleportTo(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+            placeAt(body, level, at);
         }
         BRAINS.put(body.getUUID(), new CompanionBrain(body));
         CompanionRegistry.get(server).markAlive(uuid);
+    }
+
+    /**
+     * 把一个落脚点交给她：<b>死亡点本身能站就精确回原地</b>（「原地复活」），否则就近找一处站得下的。
+     *
+     * <p>这是「原地复活」的安全网——正常人当然回原地，但若落点已变成岩浆/实心方块（世界被别人改了、
+     * 她死于岩浆），直接把身体塞进去会造成”死→回同一格→再死“的死循环（#0015 P0 变体）。
+     */
+    private static void placeAt(NumenPlayer body, ServerLevel level, BlockPos at) {
+        Vec3 where;
+        if (SafeSpawn.standable(level, at)) {
+            where = new Vec3(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+        } else {
+            Vec3 near = SafeSpawn.findNear(level, new Vec3(at.getX() + 0.5, at.getY(), at.getZ() + 0.5));
+            where = near != null ? near : new Vec3(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+        }
+        body.teleportTo(where.x, where.y, where.z);
     }
 
     /**

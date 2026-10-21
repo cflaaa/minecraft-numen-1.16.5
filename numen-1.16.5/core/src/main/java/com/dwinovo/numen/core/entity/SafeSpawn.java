@@ -85,6 +85,15 @@ final class SafeSpawn {
         return level.noCollision(standingBox(pos.x, pos.y, pos.z));
     }
 
+    /**
+     * 这一格此刻能不能站：脚下实心整方块、不在岩浆/仙人掌/火里、头顶能呼吸、放得下碰撞箱。
+     *
+     * <p>给「原地复活」用：死亡点本身能站就精确回原地（不退到附近）；不能站才去找邻域。
+     */
+    static boolean standable(ServerLevel level, BlockPos pos) {
+        return isSafe(level, pos);
+    }
+
     private static boolean isSafe(ServerLevel level, BlockPos pos) {
         if (!level.getWorldBorder().isWithinBounds(pos)) {
             return false;
