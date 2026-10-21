@@ -9,13 +9,17 @@ local COMPASS = {north = {0, -1}, south = {0, 1}, east = {1, 0}, west = {-1, 0}}
 ---raises denied. Without a distance a Pos, a column or a height is stood in; a Block, an Entity or a Cluster is gone
 ---beside.
 ---@param where any A Pos, a Block, an Entity (or its runtime number), a Cluster or Cells from a scan, a column {x = …, z = …} or a height {y = …}.
----@param distance? integer How close counts as there, in blocks (1-32). Without it, stand in it or beside it as above.
+---@param opts? integer|table How close counts as there: a number, in blocks (1-32); or a table of route.plan directions merged in (e.g. {arrive = "dig"}, {costs = {dig = true}}, {avoid = {"water"}}). Without it, stand in it or beside it as above.
 ---@return table walked Where you stand now, how far you still were, how many blocks it broke and placed.
-function M.to(where, distance)
+function M.to(where, opts)
   local spec = {to = where}
-  if distance ~= nil then
+  if type(opts) == "number" then
     spec.arrive = "near"
-    spec.range = distance
+    spec.range = opts
+  elseif type(opts) == "table" then
+    for k, v in pairs(opts) do
+      spec[k] = v
+    end
   end
   local plan = numen.route.plan(spec)
   if not plan.ok then

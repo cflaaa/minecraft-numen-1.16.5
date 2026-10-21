@@ -75,15 +75,17 @@ function M.collect(opts)
   end
 end
 
----Dig out one cluster: numen.work.dig walks up to what is out of reach and digs it (standing where the hand reaches the
----most of what is left), then pick up what that dug dropped and still lies around (numen.work.collect with its drops),
----and again until none of it is left. A round that digs nothing raises failed with what is left; any other failing step (a
+---Dig out one cluster: walk to where the hand reaches the most of what is left (numen.move.to with arrive "dig"), dig
+---what is in reach, then pick up what that dug dropped and still lies around (numen.work.collect with its drops),
+---and again until none of it is left. (In this build numen.work.dig digs only from where you stand — upstream it walked —
+---so the walking is done here.) A round that digs nothing raises failed with what is left; any other failing step (a
 ---dig that can't get there or is refused, a pick-up with no way) raises its error as it is.
 ---@param cluster Cluster|Cells What to dig: a cluster numen.scan.blocks found, as it is (or Cells, or a list of Blocks).
 ---@return integer dug How many cells it dug.
 function M.mine(cluster)
   local dug = 0
   while true do
+    numen.move.to(cluster, {arrive = "dig"})
     local r = numen.work.dig(cluster)
     dug = dug + r.dug
     M.collect({items = r.drops})
