@@ -393,9 +393,17 @@ public final class Companions {
         }
         // 把死亡（死因 + 游戏时刻）落进世界存档的注册表：撑得过复活窗口里的一次登出——
         // 没有它，重登就丢了待复活状态，身体会「活着」回来，背包空空，也不知道自己死过。
-        // 原地复活（#0015 修法）：把死亡处写进名册落点，无主同伴复活时就回这一格，而不是召唤点。
-        CompanionRegistry.get(server).markDeadAt(uuid, cause, server.overworld().getGameTime(),
-                ((ServerLevel) body.level).dimension(), body.blockPosition());
+        // 原地复活（#0015 修法）：死亡处站得下就把死亡处写进名册落点，无主同伴复活时就回这一格，而不是召唤点。
+        // 死点站不下（岩浆里/墙里/水里——比如卡在方块中窒息而死）就不写：否则会把险地写进名册，
+        // 复活又落回同一处 → 死循环（实测：卡进山体窒息 → 每 17s “suffocated in a wall”）。
+        ServerLevel deathLevel = (ServerLevel) body.level;
+        BlockPos deathPos = body.blockPosition();
+        CompanionRegistry registry = CompanionRegistry.get(server);
+        if (SafeSpawn.standable(deathLevel, deathPos)) {
+            registry.markDeadAt(uuid, cause, server.overworld().getGameTime(), deathLevel.dimension(), deathPos);
+        } else {
+            registry.markDead(uuid, cause, server.overworld().getGameTime());
+        }
         // 死亡状态进了注册表，名册才说得出「她还在，只是躺着」——面板的倒计时读这个。
         // 少了这一推，主人在死亡窗口里重登就会看见她凭空消失。
         if (owner != null) {
@@ -766,13 +774,22 @@ public final class Companions {
      * 她死于岩浆），直接把身体塞进去会造成”死→回同一格→再死“的死循环（#0015 P0 变体）。
      */
     private static void placeAt(NumenPlayer body, ServerLevel level, BlockPos at) {
-        Vec3 where;
+        Vec3 exact = new Vec3(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
         if (SafeSpawn.standable(level, at)) {
-            where = new Vec3(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
-        } else {
-            Vec3 near = SafeSpawn.findNear(level, new Vec3(at.getX() + 0.5, at.getY(), at.getZ() + 0.5));
-            where = near != null ? near : new Vec3(at.getX() + 0.5, at.getY(), at.getZ() + 0.5);
+            body.teleportTo(exact.x, exact.y, exact.z);
+            return;
         }
+        Vec3 near = SafeSpawn.findNear(level, exact);
+        if (near != null) {
+            body.teleportTo(near.x, near.y, near.z);
+            return;
+        }
+        // 附近都站不下（例如死点深深埋在厚山体里）：退回该维度的出生点，
+        // **绝不再塞回原格**——把那具身体塞回站不下的地方正是“死→回同一格→再死”的死循环（#0015）。
+        Vec3 safe = SafeSpawn.findNear(level, Vec3.atBottomCenterOf(level.getSharedSpawnPos()));
+        Vec3 where = safe != null ? safe : Vec3.atBottomCenterOf(level.getSharedSpawnPos());
+        Constants.warn("同伴 {} 的复活落点 {} 站不下、就近也找不到——退回出生点 {}", body.getName().getString(), at,
+                level.dimension().location());
         body.teleportTo(where.x, where.y, where.z);
     }
 
