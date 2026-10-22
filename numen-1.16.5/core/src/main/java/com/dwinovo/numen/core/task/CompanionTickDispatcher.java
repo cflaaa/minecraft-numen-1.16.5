@@ -138,8 +138,11 @@ public final class CompanionTickDispatcher {
                 if (ap.pollWokeUp()) {
                     Companions.onWoke(ap);
                 }
-                // 饿了说一声。她不会自己吃 —— 那条常驻链删了,交互本身就是目的。
-                if (ap.pollGotHungry()) {
+                // 饿了说一声。身体自己会吃(背包有可食,auto_eat 那条反射)时不发急件——
+                // 急件是恒急的,会把在跑的程序打断;吃完反射自己报一条 reflex 事件。
+                // 没有吃的才照旧急件求救:主人/大脑不知道就没人管(#0021)。
+                if (ap.pollGotHungry()
+                        && !com.dwinovo.numen.core.task.chain.EatChain.canFeedItself(ap)) {
                     com.dwinovo.numen.core.event.NumenEvents.gotHungry(
                             ap, ap.getFoodData().getFoodLevel());
                 }
@@ -203,6 +206,15 @@ public final class CompanionTickDispatcher {
     public static TaskRecord currentTaskFor(UUID companionUuid) {
         CompanionBrain brain = BRAINS.get(companionUuid);
         return brain == null ? null : brain.current.record();
+    }
+
+    /**
+     * 她此刻有没有一件占身体的活(当前任务或同步动作)。auto_eat 的"空闲才吃"档用:
+     * 不建脑(问的人未必在 tick,建了没人养)。
+     */
+    public static boolean bodyBusy(UUID companionUuid) {
+        CompanionBrain brain = BRAINS.get(companionUuid);
+        return brain != null && (!brain.current.isEmpty() || !brain.sync.isEmpty());
     }
 
     /**

@@ -56,6 +56,11 @@ public final class EatCompanionTask extends AbstractCompanionTask<EatItemTaskRec
 
     @Override
     protected void onStart() {
+        // 模型派的这一口在跑时,自动进食的本能别来抢身体(照 AttackCompanionTask 对 mob_defense 的口径);
+        // 本能自己开的那一口不算——它防的是"模型在喂她"这件事,不需要防它自己。
+        if (!r.fromReflex) {
+            player.pauseReflex(com.dwinovo.numen.core.task.chain.EatChain.ID);
+        }
         beforeCount = PlayerInv.count(player.getInventory(), r.item);
         beforeHp = player.getHealth();
         beforeFood = player.getFoodData().getFoodLevel();

@@ -68,8 +68,11 @@ public final class NumenCore {
 
     /** 把 core 的五条生存本能链插进引擎的竞价调度(链登记口)。 */
     private static void registerReflexes() {
-        // 注册号小的先问 —— 与原版 addGoal(int priority, goal) 同一惯例:摔落缓冲 > 换气 > 逃跑 > 自卫 > 脱困。
+        // 注册号小的先问 —— 与原版 addGoal(int priority, goal) 同一惯例:摔落缓冲 > 换气 > 逃跑 > 自卫 > 自动进食 > 脱困。
         // 逃跑压过自卫:扛不住时先跑,跑不掉它让出身体,自卫接着打。
+        // 自动进食排在自卫之后、脱困之前:打着架不吃(仗没打完它拿不到身体);饿到扣血时它
+        // 打断一切非战斗的活,被它让位的走路/挖矿只是 PREEMPTED、吃完自动续上(不丢状态,
+        // 见 TaskSlot#loseBody)。三档判据见 EatingDecisions,链本体见 EatChain(#0021)。
         // 本能之间的先后是固定的,不随世界状态变,所以是一个序号,不是一个要现算的出价。
         //
         // 正在坠落是最迫近的死法,所以摔落缓冲压过一切;卡住只是烦人,绝不该压过
@@ -82,6 +85,8 @@ public final class NumenCore {
                 com.dwinovo.numen.core.task.chain.FleeChain::new);
         com.dwinovo.numen.core.task.BrainChains.register(30,
                 com.dwinovo.numen.core.task.chain.MobDefenseChain::new);
+        com.dwinovo.numen.core.task.BrainChains.register(35,
+                com.dwinovo.numen.core.task.chain.EatChain::new);
         com.dwinovo.numen.core.task.BrainChains.register(50,
                 com.dwinovo.numen.core.task.chain.UnstuckChain::new);
     }
