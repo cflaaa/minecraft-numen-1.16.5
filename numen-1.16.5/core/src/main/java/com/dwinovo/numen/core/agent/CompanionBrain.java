@@ -3,14 +3,17 @@ package com.dwinovo.numen.core.agent;
 import com.dwinovo.numen.agent.http.CancelToken;
 import com.dwinovo.numen.agent.inbox.EventQueue;
 import com.dwinovo.numen.agent.inbox.EventTypes;
+import com.dwinovo.numen.agent.llm.ConvoLog;
 import com.dwinovo.numen.agent.llm.ConvoState;
+import com.dwinovo.numen.agent.llm.LlmEndpoint;
 import com.dwinovo.numen.agent.llm.NumenLlmClient;
 import com.dwinovo.numen.agent.loop.AgentLoop;
+import com.dwinovo.numen.agent.memory.Compactor;
+import com.dwinovo.numen.agent.provider.ProviderRegistry;
 import com.dwinovo.numen.core.agent.tool.ToolRunner;
 import com.dwinovo.numen.agent.loop.HaltReason;
 import com.dwinovo.numen.agent.loop.HostPort;
 import com.dwinovo.numen.agent.loop.LoopEvent;
-import com.dwinovo.numen.agent.loop.MemoryPort;
 import com.dwinovo.numen.agent.loop.ModelOutcome;
 import com.dwinovo.numen.agent.loop.ModelPort;
 import com.dwinovo.numen.agent.loop.ModelRequest;
@@ -48,17 +51,23 @@ import java.util.function.Consumer;
  * HTTP 的回调必须用 {@code server.execute(...)} 切回来——引擎的端口契约要求「回调在内核的线程上执行」，
  * 漏了这一步会出现「偶发、且只在网络快的时候才复现」的诡异 bug。
  *
- * <h2>这一版少什么</h2>
- * 上游的 {@code MemoryPort} 会做自动压缩（上下文逼近窗口时把历史摘要掉），
- * 这里先返回「不用压缩」——短对话完全够用。见 docs/PORTING.md 的阶段表。
+ * <h2>上下文整理</h2>
+ * {@link Compactor}（随 {@code agent} 引擎逐字移植，此处接线）：自动压缩按上一次请求的
+ * 实测体量（服务端不报用量就退本地估算）对照绑定模型的窗口闸门；近段消息逐字跨过压缩边界，
+ * 上一份摘要作为累积账单独给更新。对话同时落一份 append-only 的 {@link ConvoLog}
+ * （{@code config/numen/companions/<uuid>/chat.jsonl}）：压缩/清空只落边界，记录一个字不删。
+ * 这份日志也是将来"跨重启恢复历史"的底子——恢复那一刀还没切（收件箱同样不落盘，见
+ * {@link #MEMORY_JOURNAL}），先记着。
  */
 public final class CompanionBrain {
 
     private final NumenPlayer body;
     private final MinecraftServer server;
 
-    private final ConvoState transcript = new ConvoState();
+    private final ConvoLog log;
+    private final ConvoState transcript;
     private final EventQueue inbox = new EventQueue(MEMORY_JOURNAL);
+    private final Compactor compactor;
     private final AgentLoop loop;
 
     /** 此刻身体在干的活，给人看的一句话；没有具体动作时 null。 */
@@ -70,16 +79,33 @@ public final class CompanionBrain {
     public CompanionBrain(NumenPlayer body) {
         this.body = body;
         this.server = body.server;
+        // 对话日志：append-only，压缩/清空只落边界（CompanionHome 那一族的目录约定，服务端落在 config 下）。
+        this.log = ConvoLog.atFile(net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir()
+                .resolve("numen").resolve("companions")
+                .resolve(body.getUUID().toString()).resolve("chat.jsonl"));
+        this.transcript = new ConvoState(msg -> log.append(msg, null));
+        this.compactor = new Compactor(name(), transcript, log, this::contextWindow);
         this.loop = new AgentLoop(
                 name(),
                 new ModelPortImpl(),
                 new ToolPortImpl(),
                 transcript,
                 inbox,
-                new MemoryPortImpl(),
+                compactor,
                 new HostPortImpl());
         this.loop.subscribe(this::onLoopEvent);
+        // 实测体量（ModelUsed）与历史边界（整理/清空）是压缩闸门的判据，见 Compactor#on
+        this.loop.subscribe(compactor::on);
         this.wasDriving = McpMode.instance().driving();
+    }
+
+    /**
+     * 绑定模型的上下文窗口——自动压缩的闸门按它算。查无（自定义站点/未收录型号）吃
+     * {@code ProviderRegistry.DEFAULT_CTX}，宁早压不炸窗。
+     */
+    private int contextWindow() {
+        LlmEndpoint endpoint = NumenConfig.get().endpoint();
+        return ProviderRegistry.contextWindow(endpoint.provider(), endpoint.model());
     }
 
     /** 不落盘的队列：这一版同伴的记忆不跨存档。 */
@@ -260,8 +286,8 @@ public final class CompanionBrain {
      * 模型那一侧。
      *
      * <p>上游的 {@code ModelPort} 承担了「组装请求 / 端点检查 / 发请求」三件事，
-     * 重试、压缩、目标评估都从 {@code call} 一处发出。这里保留同样的形状，
-     * 只是压缩那一支还没接（{@link MemoryPortImpl} 恒报「不用压」）。
+     * 重试、压缩、目标评估都从 {@code call} 一处发出。这里保留同样的形状；压缩那一支
+     * 已接（{@link Compactor}，摘要请求也从这里发出）。
      */
     private final class ModelPortImpl implements ModelPort {
 
@@ -353,31 +379,6 @@ public final class CompanionBrain {
         }
     }
 
-    /**
-     * 上下文整理：这一版只支持「清空」，不做自动压缩。
-     *
-     * <p>{@code compactionDue()} 恒 false，于是引擎永远不会调 {@code compaction()}——
-     * 返回 null 是安全的（上游同样允许不压缩的实现）。
-     */
-    private final class MemoryPortImpl implements MemoryPort {
-
-        @Override
-        public boolean compactionDue() {
-            return false;
-        }
-
-        @Override
-        public Compaction compaction(boolean auto) {
-            return null;
-        }
-
-        @Override
-        public void clear() {
-            transcript.addHalt("主人清空了上下文");
-            transcript.resetTurnCount();
-        }
-    }
-
     /** 给工具用的：报告/清除「此刻在干什么」。 */
     void setActivity(String text) {
         this.activity = text;
@@ -397,11 +398,5 @@ public final class CompanionBrain {
     String where() {
         var pos = body.blockPosition();
         return pos.getX() + "," + pos.getY() + "," + pos.getZ();
-    }
-
-    /** 未使用，保留给将来的 Compaction 实现做编译期占位。 */
-    @SuppressWarnings("unused")
-    private static Component text(String s) {
-        return new TextComponent(s);
     }
 }
