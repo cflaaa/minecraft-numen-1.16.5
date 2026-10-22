@@ -9,7 +9,9 @@ import com.dwinovo.numen.agent.llm.LlmEndpoint;
 import com.dwinovo.numen.agent.llm.NumenLlmClient;
 import com.dwinovo.numen.agent.loop.AgentLoop;
 import com.dwinovo.numen.agent.memory.Compactor;
+import com.dwinovo.numen.agent.memory.NoteBook;
 import com.dwinovo.numen.agent.provider.ProviderRegistry;
+import com.dwinovo.numen.agent.request.MemoryPreamble;
 import com.dwinovo.numen.core.agent.tool.ToolRunner;
 import com.dwinovo.numen.agent.loop.HaltReason;
 import com.dwinovo.numen.agent.loop.HostPort;
@@ -68,6 +70,7 @@ public final class CompanionBrain {
     private final ConvoState transcript;
     private final EventQueue inbox = new EventQueue(MEMORY_JOURNAL);
     private final Compactor compactor;
+    private final MemoryPreamble memory;
     private final AgentLoop loop;
 
     /** 此刻身体在干的活，给人看的一句话；没有具体动作时 null。 */
@@ -85,6 +88,9 @@ public final class CompanionBrain {
                 .resolve(body.getUUID().toString()).resolve("chat.jsonl"));
         this.transcript = new ConvoState(msg -> log.append(msg, null));
         this.compactor = new Compactor(name(), transcript, log, this::contextWindow);
+        // 札记索引的贴不贴策略在这它那（只在历史里那份没了或过时了时重贴，见 MemoryPreamble）；
+        // 同一本 NoteBook 与 memory 工具共享（NoteBook.of 按同伴缓存）
+        this.memory = new MemoryPreamble(NoteBook.of(body.getUUID()));
         this.loop = new AgentLoop(
                 name(),
                 new ModelPortImpl(),
@@ -96,6 +102,8 @@ public final class CompanionBrain {
         this.loop.subscribe(this::onLoopEvent);
         // 实测体量（ModelUsed）与历史边界（整理/清空）是压缩闸门的判据，见 Compactor#on
         this.loop.subscribe(compactor::on);
+        // 压缩/清空把历史里那份 <memory> 索引吃掉了——下一次注入得重贴一份完整的
+        this.loop.subscribe(memory::on);
         this.wasDriving = McpMode.instance().driving();
     }
 
@@ -268,7 +276,9 @@ public final class CompanionBrain {
 
         @Override
         public String injectionPreamble() {
-            return "";
+            // <memory> 索引垫在每次注入的 user 消息最前：内容会变（她一记就变），放系统提示会打碎缓存前缀。
+            // 没变就不重贴——历史里已躺着一份，再贴是白花的 token（策略见 MemoryPreamble）
+            return memory.next();
         }
 
         @Override
@@ -298,10 +308,12 @@ public final class CompanionBrain {
 
         @Override
         public ModelRequest turnRequest() {
+            // 系统提示只在会话内稳定的那几层（人设/操作核心/技能表/<api>索引/本能名册/札记规矩/说话规矩），
+            // 组装见 NumenSystemPrompt——是字节级稳定的缓存前缀
             return new ModelRequest(
                     transcript.snapshot(),
                     ToolRunner.specs(),
-                    NumenSystemPrompt.system(NumenConfig.get().persona));
+                    NumenSystemPrompt.system(NumenConfig.get().persona, body.getUUID()));
         }
 
         @Override
