@@ -28,5 +28,6 @@ public final class CoreReflexes {
         ReflexRegistry.register(new MobDefenseChain());
         ReflexRegistry.register(new UnstuckChain());
         ReflexRegistry.register(new com.dwinovo.numen.core.task.chain.EatChain());
+        ReflexRegistry.register(new com.dwinovo.numen.core.task.chain.ForageChain());
     }
 }

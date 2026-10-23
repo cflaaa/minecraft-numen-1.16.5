@@ -87,6 +87,10 @@ public final class NumenCore {
                 com.dwinovo.numen.core.task.chain.MobDefenseChain::new);
         com.dwinovo.numen.core.task.BrainChains.register(35,
                 com.dwinovo.numen.core.task.chain.EatChain::new);
+        // 无食自救(#0025):背包空的时自己去打猎。排在 EatChain 之后——有吃的先吃,
+        // 没吃的才轮到它;打完捡起来,下一刻 EatChain 拿到有吃的的身体自己去吃。
+        com.dwinovo.numen.core.task.BrainChains.register(36,
+                com.dwinovo.numen.core.task.chain.ForageChain::new);
         com.dwinovo.numen.core.task.BrainChains.register(50,
                 com.dwinovo.numen.core.task.chain.UnstuckChain::new);
     }

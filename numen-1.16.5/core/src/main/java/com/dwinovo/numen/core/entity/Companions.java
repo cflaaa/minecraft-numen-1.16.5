@@ -187,17 +187,21 @@ public final class Companions {
         return CompanionRoster.findByName(rowsOf(server, ownerUuid), name);
     }
 
-    /** 遣散一只同伴。 */
+    /**
+     * 遣散一只同伴。
+     *
+     * <p>#0026:以前这里只 {@code despawn} 身体，<b>没从 {@link CompanionRegistry} 除名</b>——下次开服
+     * 名册照旧把她重建回来（MCP {@code delete_companion} 说"gone for good"，重启后全体复活）。
+     * 现在改走<b>唯一的遣散入口</b> {@link #dismiss(MinecraftServer, NumenPlayer)}：掉光身上的东西、
+     * 从 {@code .dat} 除名（{@code forget}）、通知主人。面板 ✕、{@code /numen … dismiss}、MCP
+     * {@code delete_companion} 三条路因此行为一致。
+     */
     public static boolean dismiss(MinecraftServer server, String name) {
         NumenPlayer body = findByName(server, name);
         if (body == null) {
             return false;
         }
-        CompanionBrain brain = BRAINS.remove(body.getUUID());
-        if (brain != null) {
-            brain.halt("被主人遣散");
-        }
-        CompanionFactory.despawn(server, body);
+        dismiss(server, body);
         Constants.info("同伴 {} 已遣散", name);
         return true;
     }

@@ -138,13 +138,14 @@ public final class CompanionTickDispatcher {
                 if (ap.pollWokeUp()) {
                     Companions.onWoke(ap);
                 }
-                // 饿了说一声。身体自己会吃(背包有可食,auto_eat 那条反射)时不发急件——
-                // 急件是恒急的,会把在跑的程序打断;吃完反射自己报一条 reflex 事件。
-                // 没有吃的才照旧急件求救:主人/大脑不知道就没人管(#0021)。
+                // 饿了说一声。身体能自救时不发急件、更不打断在跑的程序(#0025):
+                //   背包有可食 → auto_eat 自己吃;没吃的但附近有可猎 → forage 自己去打;
+                //   两样都没有(真没人管了)才标急件求救。
                 if (ap.pollGotHungry()
                         && !com.dwinovo.numen.core.task.chain.EatChain.canFeedItself(ap)) {
+                    boolean canForage = com.dwinovo.numen.core.task.chain.ForageChain.canForage(ap);
                     com.dwinovo.numen.core.event.NumenEvents.gotHungry(
-                            ap, ap.getFoodData().getFoodLevel());
+                            ap, ap.getFoodData().getFoodLevel(), !canForage);
                 }
                 // 背包满了、东西留在了地上说一声:判据只在身体上一处,挖、捡、合成这些活不各自判。
                 NumenPlayer.LeftBehind leftBehind = ap.pollInventoryFull();

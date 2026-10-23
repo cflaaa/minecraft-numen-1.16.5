@@ -85,10 +85,15 @@ end
 function M.mine(cluster)
   local dug = 0
   while true do
-    numen.move.to(cluster, {arrive = "dig"})
+    -- 本仓的 numen.move.to 默认不挖不放（costs 里没有 dig/place）：山地、台阶这类地形要垫一格
+    -- 或挖一格才过得去时，不开 place 会直接 no_path（#0023b）。挖矿这种活本就该允许动地形。
+    numen.move.to(cluster, {arrive = "dig", costs = {dig = true, place = true}})
     local r = numen.work.dig(cluster)
     dug = dug + r.dug
-    M.collect({items = r.drops})
+    -- 捡得到的都捡。本仓 numen.work.dig 的 drops 恒为空（#0005），拿它当过滤器等于一个都不捡（#0023a）；
+    -- 所以按半径捡，而不是按 r.drops 过滤。够不到的掉落会让 collect 报 no_path，但可捡的已经进包了，
+    -- 别因此让整段 mine 失败——所以 pcall 兜住。
+    pcall(M.collect, {radius = 8})
     if r.left == 0 then
       return dug
     end

@@ -56,14 +56,15 @@ public final class NumenEvents {
     private NumenEvents() {}
 
     /**
-     * 她饿了。<b>急</b> —— 她不会自己吃,主人不知道就没人管,饱食归零会开始掉血。
-     * 去抖在 {@code NumenPlayer.pollGotHungry}:一轮饥饿只发一条。
+     * 她饿了。<b>急不急由身体能不能自救定</b>(#0025):背包有可食({@code auto_eat})或附近有可猎
+     * ({@code forage})就不急——只是通知,搭下一轮的车,<b>不打断在跑的程序</b>;两样都没有才标急
+     * (主人/大脑不管就真没人管了)。去抖在 {@code NumenPlayer.pollGotHungry}:一轮饥饿只发一条。
      */
-    public static void gotHungry(NumenPlayer companion, int foodLevel) {
+    public static void gotHungry(NumenPlayer companion, int foodLevel, boolean urgent) {
         emit(companion, EventTypes.HUNGRY, null,
                 "you are hungry (" + foodLevel + "/20) and you do not eat on your own — "
                         + "numen.inv.eat something from your inventory, or go get food",
-                true);
+                urgent);
     }
 
     /**

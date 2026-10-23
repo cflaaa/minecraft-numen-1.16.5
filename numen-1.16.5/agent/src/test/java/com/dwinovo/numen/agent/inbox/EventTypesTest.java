@@ -48,7 +48,9 @@ class EventTypesTest {
         // 恒急的是"她不知道,正在做的事就是错的";其余由发送方按事情本身定
         assertRow(EventTypes.TASK_FINISHED, EventTypes.Delivery.STEER, false, false, false, false);
         assertRow(EventTypes.DEATH, EventTypes.Delivery.STEER, true, false, false, false);
-        assertRow(EventTypes.HUNGRY, EventTypes.Delivery.STEER, true, false, false, false);
+        // #0025:饥饿不再恒急——身体能自救(auto_eat/forage)时只是通知,
+        // 由发送方按能不能自救定急不急,免得一遍遍打断在跑的程序。
+        assertRow(EventTypes.HUNGRY, EventTypes.Delivery.STEER, false, false, false, false);
         assertRow(EventTypes.OWNER_HURT, EventTypes.Delivery.STEER, false, false, false, false);
         assertRow(EventTypes.TIMER, EventTypes.Delivery.STEER, true, false, false, false);
         assertRow(EventTypes.WOKE, EventTypes.Delivery.STEER, true, false, false, false);
@@ -151,7 +153,7 @@ class EventTypesTest {
     @Test
     void alwaysUrgentTypesAreUrgentWhateverTheSenderSays() {
         for (String id : new String[] {EventTypes.QUERY, EventTypes.GOAL,
-                EventTypes.DEATH, EventTypes.HUNGRY, EventTypes.TIMER, EventTypes.WOKE}) {
+                EventTypes.DEATH, EventTypes.TIMER, EventTypes.WOKE}) {
             EventQueue q = new EventQueue(EventQueue.Journal.NONE);
             java.util.concurrent.atomic.AtomicInteger woken = new java.util.concurrent.atomic.AtomicInteger();
             q.addUrgentListener(woken::incrementAndGet);

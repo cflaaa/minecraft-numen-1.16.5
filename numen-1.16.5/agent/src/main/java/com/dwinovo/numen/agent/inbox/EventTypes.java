@@ -62,7 +62,11 @@ public final class EventTypes {
     public static final String TASK_FINISHED = "task_finished";
     /** 她死了又复活了(在客户端合成——身体那会儿已经不在了)。恒为急件:她对自己处境的认知几乎全作废了。 */
     public static final String DEATH = "death";
-    /** 饿了 —— 她不会自己吃,得主人给或者叫她去弄。恒为急件。 */
+    /**
+     * 饿了 —— 身体有 {@code auto_eat}(背包有可食)与 {@code forage}(无食自救)两条本能兜底。
+     * #0025:所以它<b>不再恒为急件</b>——发送方按"身体能不能自己解决"定急不急(能自救就只是通知,
+     * 不打断在跑的程序);真到"无食且附近无可猎"才标急件求救,与旧行为一致。
+     */
     public static final String HUNGRY = "hungry";
     /**
      * 背包一格空的都没有了,碰到的东西放不下、留在了地上。恒为急件:她不知道的话,接着挖、接着捡,东西都落在地上。
@@ -264,7 +268,7 @@ public final class EventTypes {
         // 其余由发的那一方按事情本身定(任务按 status、主人挨打按血线)。
         register(event(TASK_FINISHED, false));
         register(event(DEATH, true));
-        register(event(HUNGRY, true));
+        register(event(HUNGRY, false));
         register(event(INVENTORY_FULL, true));
         register(new Type(ADVANCEMENT_REWARD, s -> s, s -> null, false, false, Delivery.AMBIENT, false));
         register(event(OWNER_HURT, false));
