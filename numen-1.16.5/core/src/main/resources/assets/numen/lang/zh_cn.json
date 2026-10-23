@@ -1,7 +1,6 @@
 {
-  "key.numen.open_panel": "打开 Numen 面板",
+  "key.numen.open_panel": "打开 Numen 设置面板",
   "key.categories.numen": "Numen",
-
   "numen.permission.separator": "、",
   "numen.permission.a_block": "方块",
   "numen.permission.placed_by": "%s 放的",
@@ -16,7 +15,6 @@
   "numen.permission.signal.villager": "村民",
   "numen.permission.signal.hostile": "敌对",
   "numen.permission.signal.hazard_item": "危险",
-
   "numen.consent.allow": "允许",
   "numen.consent.allow_remember": "以后都允许",
   "numen.consent.deny": "拒绝",
@@ -45,11 +43,9 @@
   "numen.consent.ask": "想%s,可以吗?",
   "numen.consent.ask_many": "想做这几件事,可以吗?",
   "numen.consent.seconds": "%s 秒",
-
   "numen.command.consent.answered": "已答复征询 #%s(%s):%s",
   "numen.command.consent.not_owner": "征询 #%s 属于别人的同伴",
   "numen.command.consent.not_pending": "没有待答复的征询 #%s(已答复、过期或被顶掉)",
-
   "numen.command.permission.yours_not_here": "你叫「%s」的同伴不在这里",
   "numen.command.permission.mode": "%s:权限模式 %s",
   "numen.command.permission.mode_set": "%s:权限模式已设为 %s",
@@ -61,5 +57,6 @@
   "numen.command.permission.rule_exists": "%s 里已经有:%s",
   "numen.command.permission.rule_no_row": "%s 没有第 %s 行(一共 %s 行);行号用 /numen permission rules list 看",
   "numen.command.permission.rule_removed": "已从 %s 删掉:%s",
-  "numen.command.permission.rules_reset": "清空了你的 deny、ask、allow 三张表;出厂规则照旧生效"
+  "numen.command.permission.rules_reset": "清空了你的 deny、ask、allow 三张表;出厂规则照旧生效",
+  "key.numen.open_companion_inventory": "打开同伴的背包"
 }

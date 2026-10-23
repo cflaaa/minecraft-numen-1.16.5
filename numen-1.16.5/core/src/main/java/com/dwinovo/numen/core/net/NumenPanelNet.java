@@ -48,6 +48,8 @@ public final class NumenPanelNet {
     public static final String OP_SUMMON = "summon";
     public static final String OP_DISMISS = "dismiss";
     public static final String OP_TELL = "tell";
+    /** G 键：打开同伴的背包（客户端版需求 #0027）。name 空串 = 让服务端挑最近的一只。 */
+    public static final String OP_OPEN_INV = "open_inventory";
     public static final String OP_CONFIG = "config";
     public static final String OP_MCP = "mcp";
     public static final String OP_MODELS = "models";

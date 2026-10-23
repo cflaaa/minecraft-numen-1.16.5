@@ -258,6 +258,9 @@ public final class McpActuator {
                         f.complete(ToolOutcome.failure("没有这只同伴（可能已被遣散）——先 list_companions 看看"));
                         return;
                     }
+                    // #0027：把外脑的意图讲进原版聊天栏——思考过程客户端那边看得见。
+                    com.dwinovo.numen.core.chat.CompanionNarrator.thinking(s, brain.name(),
+                            summaryOf(toolName, args));
                     LlmToolCall call = new LlmToolCall(TOOL_PREFIX + SEQ.incrementAndGet(), toolName, args);
                     if (!brain.runExternal(call, f::complete)) {
                         f.complete(ToolOutcome.failure(
@@ -277,6 +280,29 @@ public final class McpActuator {
     //  内部
     // =====================================================================
 
+    /**
+     * 旁白用的摘要：Lua 程序取代码第一行（外脑写程序时的注释就是它此刻的意图），
+     * 其余工具取工具名。别的都不长——聊天栏不是日志。
+     */
+    private static String summaryOf(String toolName, String argsJson) {
+        if ("lua".equalsIgnoreCase(toolName) && argsJson != null && !argsJson.isBlank()) {
+            try {
+                // gson 2.8.0（1.16.5 随包）：没有 JsonParser.parseString（2.8.6+），用共享的那个 PARSER。
+                com.google.gson.JsonObject o = com.dwinovo.numen.core.net.NumenPanelNet.parse(argsJson);
+                if (o.has("code")) {
+                    for (String line : o.get("code").getAsString().split("\n")) {
+                        String t = line.trim();
+                        if (!t.isEmpty()) {
+                            return t.length() > 60 ? t.substring(0, 60) + "…" : t;
+                        }
+                    }
+                }
+            } catch (RuntimeException ignored) {
+                // 解析不出就不解析：旁白是锦上添花，不是链路的一环
+            }
+        }
+        return toolName;
+    }
     /**
      * 把一件活切到服务端主线程上做，结果带回来。
      *

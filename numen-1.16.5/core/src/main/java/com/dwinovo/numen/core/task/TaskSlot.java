@@ -58,6 +58,11 @@ final class TaskSlot {
         // start() 里就走到终态的(一次性动作把活全干完了 / 前置条件不通过)当刻结算,
         // 免得它空占一刻 RUNNING —— 那一刻里的一次"停止"会给已经干完的事发中断。
         settleIfTerminal(companion);
+        // #0027：把「她此刻在做」讲进原版聊天栏。当刻就结掉的不播——那是一闪而过的空忙。
+        if (record == rec) {
+            com.dwinovo.numen.core.chat.CompanionNarrator.doing(companion.server,
+                    companion.getName().getString(), rec.describe());
+        }
     }
 
     /** 前进一刻:先看 deadline,再跑一刻,走到终态就结算。 */
@@ -146,6 +151,14 @@ final class TaskSlot {
         com.dwinovo.numen.core.permission.ConsentDesk.of(companion).release(record,
                 cause == null ? com.dwinovo.numen.core.permission.ConsentDesk.Withdrawal.TASK_ENDED : cause.withdrawal());
         outbox.accept(record);
+        // #0027：干得够久的活把用时讲进聊天栏（一闪而过的短活不喫）。
+        long seconds = record.getStartedGameTime() < 0 ? 0
+                : Math.max(0, companion.level.getGameTime() - record.getStartedGameTime()) / 20;
+        if (seconds >= 5) {
+            com.dwinovo.numen.core.chat.CompanionNarrator.done(companion.server,
+                    companion.getName().getString(),
+                    record.describe() + " — " + record.getState() + " · " + seconds + "s");
+        }
         task = null;
         record = null;
     }

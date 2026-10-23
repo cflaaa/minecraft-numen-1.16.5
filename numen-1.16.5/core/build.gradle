@@ -147,3 +147,26 @@ tasks.named('jar', Jar) {
 tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
     it.remapperIsolation.set(true)
 }
+
+// 「纯客户端版」（#0027）：同一份类、同一个 mod id，只是 fabric.mod.json 换成
+// environment=client 的那份（core/fabric.mod.client.json）——Fabric Loader 按它过滤，
+// 专用服务器上不会加载这份 jar；客户端装它就够：G 开同伴背包、B 开设置面板、
+// 原版聊天直达外接 agent。服务端继续用主产物。
+//
+// 为什么不是两套源集：客户端要用的类（容器、协议、引擎层）与服务端交织在同一个类图里，
+// 拆源集只换来"jar 小一点"，代价是两套 loom 配置与四条 include 依赖重讲一遍。
+// 真要拆，等客户端侧长大到值得拆的时候再拆。
+def remapClientSource = tasks.named('remapJar')
+tasks.register('clientOnlyJar', Zip) {
+    group = 'build'
+    description = '纯客户端版：同一构建，fabric.mod.json 标 environment=client。'
+    dependsOn remapClientSource
+    archiveFileName = "${mod_name}-Client-fabric-${minecraft_version}-${version}.jar"
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    from({ zipTree(remapClientSource.get().archiveFile) }) {
+        exclude 'fabric.mod.json'
+    }
+    from(file('fabric.mod.client.json')) {
+        rename { 'fabric.mod.json' }
+    }
+}

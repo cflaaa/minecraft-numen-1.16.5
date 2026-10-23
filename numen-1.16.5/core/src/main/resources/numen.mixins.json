@@ -18,6 +18,7 @@
         "MenuDataSlotsAccessor",
         "PalettedContainerAccessor",
         "ServerboundAcceptTeleportationPacketAccessor",
+        "ServerChatMixin",
         "ServerLevelBlockChangeMixin",
         "ServerPlayerChangeDimensionMixin",
         "SlotAccessor"

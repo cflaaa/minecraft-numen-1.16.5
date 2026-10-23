@@ -31,6 +31,8 @@ public final class NumenClientFabric implements ClientModInitializer {
     private static final String CATEGORY = "key.categories.numen";
 
     private static KeyMapping openPanel;
+    /** G：打开准星所指（或最近）同伴的背包（#0027）。 */
+    private static KeyMapping openCompanionInventory;
 
     /**
      * 排查界面用的开关：加 JVM 参数 {@code -Dnumen.panel=settings}（或 {@code companions}）启动，
@@ -45,11 +47,23 @@ public final class NumenClientFabric implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        openPanel = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-                "key.numen.open_panel",
+        // 键位（#0027 起）：G = 打开同伴的背包（客户端版的主入口），B = 原来的设置面板。
+        // 都可在「选项 → 控制」里改。原面板从 G 挪到 B，是因为用户把 G 定义成了「背包」。
+        openCompanionInventory = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.numen.open_companion_inventory",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_G,
                 CATEGORY));
+        openPanel = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.numen.open_panel",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_B,
+                CATEGORY));
+
+        // 同伴背包的界面：Fabric 把原版私有的 MenuScreens.register 暴露成了 ScreenRegistry.register。
+        net.fabricmc.fabric.api.client.screenhandler.v1.ScreenRegistry.register(
+                com.dwinovo.numen.core.inventory.NumenMenus.COMPANION_INVENTORY,
+                CompanionInventoryScreen::new);
 
         ClientPlayNetworking.registerGlobalReceiver(NumenPanelNet.CHANNEL,
                 (client, handler, buf, responseSender) -> {
@@ -65,7 +79,7 @@ public final class NumenClientFabric implements ClientModInitializer {
                 });
 
         ClientTickEvents.END_CLIENT_TICK.register(NumenClientFabric::tick);
-        Constants.info("[numen-panel] 客户端已就绪：按 G 打开面板（可在「选项 → 控制」里改键）");
+        Constants.info("[numen-panel] 客户端已就绪：按 G 打开同伴背包，按 B 打开设置面板（可在「选项 → 控制」里改键）");
     }
 
     /**
@@ -83,6 +97,22 @@ public final class NumenClientFabric implements ClientModInitializer {
                 mc.setScreen(null);
             } else if (mc.screen == null && mc.player != null) {
                 mc.setScreen(new NumenPanelScreen());
+            }
+        }
+        // G：请服务端打开同伴的背包。准星点着谁就开谁的；没点名就由服务端挑最近的一只。
+        // 界面本身由服务端发回的开容器包弹起（原版那套），这里只发请求。
+        while (openCompanionInventory.consumeClick()) {
+            if (mc.player != null && mc.screen == null) {
+                String target = "";
+                net.minecraft.world.phys.HitResult hit = mc.player.pick(6.0D, 0.0F, false);
+                if (hit instanceof net.minecraft.world.phys.EntityHitResult entityHit
+                        && entityHit.getEntity() instanceof net.minecraft.world.entity.player.Player other) {
+                    target = other.getName().getString();
+                }
+                if (!NumenPanelState.openInventory(target)) {
+                    mc.player.displayClientMessage(
+                            new net.minecraft.network.chat.TextComponent("§7[numen] 服务端没有 numen，开不了"), false);
+                }
             }
         }
         // 排查用：自动开一次面板（只在设了 -Dnumen.panel 时）。

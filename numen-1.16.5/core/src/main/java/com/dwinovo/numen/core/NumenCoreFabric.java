@@ -92,6 +92,10 @@ public final class NumenCoreFabric implements ModInitializer {
         NumenCore.init();
         NumenConfig.load();
 
+        // 同伴的背包（#0027，客户端版的 G 键入口）：两边各注册一次，
+        // 服务端拿它开容器，客户端拿它弹界面，注册表 id 把两头咬合。
+        com.dwinovo.numen.core.inventory.NumenMenus.register();
+
         // 外接大脑（MCP）：读配置，开着就立刻起服。
         // 本仓没有设置面板，改 host/port/开关要重进游戏（见 docs/PORTING.md）。
         Path mcpFile = FabricLoader.getInstance().getConfigDir()

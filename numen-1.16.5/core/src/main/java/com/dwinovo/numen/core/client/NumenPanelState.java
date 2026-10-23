@@ -73,13 +73,13 @@ public final class NumenPanelState {
         }
     }
 
-    private static void send(String op, String key, String value) {
+    private static boolean send(String op, String key, String value) {
         JsonObject o = NumenPanelNet.obj();
         o.addProperty("op", op);
         if (key != null) {
             o.addProperty(key, value);
         }
-        send(o);
+        return send(o);
     }
 
     public static void requestRefresh() {
@@ -100,6 +100,15 @@ public final class NumenPanelState {
         o.addProperty("name", name);
         o.addProperty("text", text);
         send(o);
+    }
+
+    /**
+     * G 键「打开同伴的背包」（#0027）。{@code name} 空串 = 让服务端挑最近的一只。
+     *
+     * @return 发出去没有；发不出去通常是服务端没装 numen（或频道不匹配）。
+     */
+    public static boolean openInventory(String name) {
+        return send(NumenPanelNet.OP_OPEN_INV, "name", name == null ? "" : name);
     }
 
     public static void setConfig(String key, String value) {

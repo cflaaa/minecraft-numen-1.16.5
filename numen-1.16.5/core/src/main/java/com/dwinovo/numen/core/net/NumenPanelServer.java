@@ -6,6 +6,7 @@ import com.dwinovo.numen.core.command.NumenCommand;
 import com.dwinovo.numen.core.config.NumenConfig;
 import com.dwinovo.numen.core.entity.Companions;
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.dwinovo.numen.core.inventory.CompanionInventoryMenu;
 import com.dwinovo.numen.core.llm.ModelCatalog;
 import com.dwinovo.numen.core.llm.ModelCatalogState;
 import com.dwinovo.numen.core.mcp.McpMode;
@@ -13,8 +14,10 @@ import com.google.gson.JsonObject;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.SimpleMenuProvider;
 
 /**
  * G 面板的服务端一侧：收客户端的请求，在服务端主线程上执行，再把新快照回过去。
@@ -87,6 +90,14 @@ public final class NumenPanelServer {
                 if (ok) {
                     note = "已转达给 " + name;
                 }
+            }
+            case NumenPanelNet.OP_OPEN_INV -> {
+                // G 键「打开同伴的背包」（#0027）：准星点着谁就开谁的（客户端把名字带上）；
+                // 没点名或点名不认识，就开 16 格内最近的一只。背包是原版容器那套，
+                // 服务端这半把槽挂在她真格的 PlayerInventory 上——放进去的她真背着。
+                String name = NumenPanelNet.str(req, "name", "").trim();
+                note = openCompanionInventory(server, player, name);
+                ok = note == null;
             }
             case NumenPanelNet.OP_CONFIG -> {
                 String key = NumenPanelNet.str(req, "key", "");
@@ -214,6 +225,32 @@ public final class NumenPanelServer {
             return missing;
         }
         brain.tell(text);
+        return null;
+    }
+
+    /**
+     * G 键「打开同伴的背包」（#0027）：返回 null = 已打开（开容器的包已经发过去了）；
+     * 返回字符串 = 给玩家看的失败原因。点名找不到或没点名，就取 16 格内最近的一只。
+     */
+    private static String openCompanionInventory(MinecraftServer server, ServerPlayer player, String name) {
+        NumenPlayer body = name.isBlank() ? null : Companions.findByName(server, name);
+        if (body == null) {
+            double best = 16 * 16;
+            for (NumenPlayer c : Companions.all(server)) {
+                double d = player.distanceToSqr(c);
+                if (d < best) {
+                    best = d;
+                    body = c;
+                }
+            }
+        }
+        if (body == null) {
+            return "附近没有同伴（16 格内）";
+        }
+        final NumenPlayer companion = body;   // 交给 λ 要 effectively final
+        player.openMenu(new SimpleMenuProvider(
+                (id, inv, p) -> new CompanionInventoryMenu(id, inv, companion.inventory, companion),
+                new TextComponent(companion.getName().getString() + " 的背包")));
         return null;
     }
 

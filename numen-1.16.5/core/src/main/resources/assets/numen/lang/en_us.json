@@ -1,7 +1,6 @@
 {
-  "key.numen.open_panel": "Open Numen panel",
+  "key.numen.open_panel": "Open Numen settings panel",
   "key.categories.numen": "Numen",
-
   "numen.permission.separator": ", ",
   "numen.permission.a_block": "a block",
   "numen.permission.placed_by": "placed by %s",
@@ -16,7 +15,6 @@
   "numen.permission.signal.villager": "villager",
   "numen.permission.signal.hostile": "hostile",
   "numen.permission.signal.hazard_item": "dangerous",
-
   "numen.consent.allow": "Allow",
   "numen.consent.allow_remember": "Always allow",
   "numen.consent.deny": "Deny",
@@ -45,11 +43,9 @@
   "numen.consent.ask": "May I %s?",
   "numen.consent.ask_many": "May I do these?",
   "numen.consent.seconds": "%ss",
-
   "numen.command.consent.answered": "Answered consent request #%s for %s: %s",
   "numen.command.consent.not_owner": "Consent request #%s belongs to a companion that is not yours",
   "numen.command.consent.not_pending": "No pending consent request #%s (already answered, expired or replaced)",
-
   "numen.command.permission.yours_not_here": "No companion of yours named '%s' is here",
   "numen.command.permission.mode": "%s: permission mode %s",
   "numen.command.permission.mode_set": "%s: permission mode set to %s",
@@ -61,5 +57,6 @@
   "numen.command.permission.rule_exists": "%s already has: %s",
   "numen.command.permission.rule_no_row": "%s has no row %s (it has %s); /numen permission rules list shows the numbers",
   "numen.command.permission.rule_removed": "Removed from %s: %s",
-  "numen.command.permission.rules_reset": "Cleared your deny, ask and allow tables; the factory rules still apply"
+  "numen.command.permission.rules_reset": "Cleared your deny, ask and allow tables; the factory rules still apply",
+  "key.numen.open_companion_inventory": "Open companion inventory"
 }
