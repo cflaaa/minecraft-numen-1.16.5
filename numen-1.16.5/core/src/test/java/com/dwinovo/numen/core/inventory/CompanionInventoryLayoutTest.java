@@ -49,7 +49,7 @@ class CompanionInventoryLayoutTest {
                 "面板纵向越出窗口");
     }
 
-    /** 槽位顺序：每侧 41 + 5，快捷栏起点 32。 */
+    /** 槽位顺序：她 41、玩家 41+5（合成），快捷栏起点 32。 */
     @Test
     void slotOrderMatchesTheClientToo() {
         assertEquals(41, CompanionInventoryMenu.PANEL_SLOTS);
@@ -57,5 +57,20 @@ class CompanionInventoryLayoutTest {
         assertEquals(4 + 1 + 27, CompanionInventoryMenu.COMPANION_HOTBAR_FIRST);
         assertTrue(CompanionInventoryMenu.COMPANION_HOTBAR_FIRST + 9 <= CompanionInventoryMenu.PANEL_SLOTS,
                 "她的快捷栏 9 格不能越过一侧面板");
+    }
+
+    /**
+     * 快捷栏的 y 是原版那个 <b>142</b>，不是 {@code MAIN_Y + 3*18 = 138}——主背包三行与快捷栏
+     * 之间原版留了 4 像素。按 138 算会整行上移 4px，格子和贴图凹槽错开、物品看着不在格心里
+     * （2026-10-24 用户截图指出）。这条断言就是为它写的。
+     */
+    @Test
+    void theHotbarSitsFourPixelsBelowTheMainRows() {
+        assertEquals(142, CompanionInventoryMenu.HOTBAR_Y, "原版快捷栏 y 是 142");
+        assertTrue(CompanionInventoryMenu.HOTBAR_Y > CompanionInventoryMenu.MAIN_Y + 3 * SLOT,
+                "快捷栏要在主背包三行之下，且留出原版那 4 像素的间距");
+        assertTrue(CompanionInventoryMenu.PAD + CompanionInventoryMenu.HOTBAR_Y + SLOT
+                        <= CompanionInventoryMenu.PAD + CompanionInventoryMenu.PANEL_H,
+                "快捷栏必须落在面板内");
     }
 }

@@ -7,6 +7,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.Slot;
@@ -14,15 +15,16 @@ import net.minecraft.world.inventory.Slot;
 import static net.minecraft.client.gui.GuiComponent.fill;
 
 /**
- * 同伴背包的界面（G 键打开，#0027）——<b>两块完整「玩家背包」面板并排</b>：
- * 左边是她的、右边是你自己的，都带角色模型与 2×2 合成，格位与贴图逐像素照原版
- * {@code InventoryScreen}（176×166 的 {@code inventory.png}）。
+ * 同伴背包的界面（G 键打开，#0027）——两块「玩家背包」面板并排：左她、右你。
  *
- * <p>背景直接 blit 原版贴图两次——凹槽、模型黑框、合成箭头全在贴图里，位置与格位天然对齐
- * （这也是当初改用原版贴图的原因：自绘只能画凹槽，画不出模型框与合成台那套家具）。
+ * <p>背景直接 blit 原版 {@code inventory.png} 两次，格位逐像素对齐原版。
+ * 她那一侧的<b>合成区换成了状态区</b>（血量/饥饿/效果）：她把合成那格盖成面板灰再自绘状态，
+ * 因为贴图里烤着合成台的凹槽与箭头，不盖掉就会露出"用不到的家具"。
  *
- * <p>她<b>手里拿着的那一格</b>由 {@link CompanionInventoryMenu#heldIndex()} 高亮
- * （经数据槽同步）——手持不是单独一格，是快捷栏里的选中格。
+ * <p>标题也去掉了：原版把标题画在左上角，那位置在本布局里正压着<b>盔甲列</b>——
+ * 挡视线又没有信息量（左边靠状态区的名字区分，右边看一眼模型就知道是自己的）。
+ *
+ * <p>她<b>手里拿着的那一格</b>高亮（{@link CompanionInventoryMenu#heldIndex()}，经数据槽同步）。
  */
 public final class CompanionInventoryScreen extends AbstractContainerScreen<CompanionInventoryMenu> {
 
@@ -31,18 +33,25 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
     private static final int PANEL_W = 176;
     private static final int PANEL_H = 166;
 
+    private static final int PANEL_GREY = 0xFFC6C6C6;
+    private static final int TEXT = 0xFF404040;
+    private static final int TEXT_DIM = 0xFF707070;
+    private static final int BAR_BG = 0xFF3A3A3A;
+    private static final int HEALTH_FILL = 0xFFD23A3A;
+    private static final int FOOD_FILL = 0xFFC98A2B;
+
     private static final int HELD_HIGHLIGHT = 0x55FFFFFF;
     private static final int HELD_EDGE = 0xCCFFFFFF;
+
+    /** 她那一侧被状态区占掉的区域（面板相对坐标）：原合成区那一块。 */
+    private static final int STATUS_X = 86;
+    private static final int STATUS_W = PANEL_W - STATUS_X;
+    private static final int STATUS_H = 80;
 
     public CompanionInventoryScreen(CompanionInventoryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         this.imageWidth = CompanionInventoryMenu.WIDTH;
         this.imageHeight = CompanionInventoryMenu.HEIGHT;
-        // 两个标题：左边用菜单的 displayName（"Alice 的背包"），右边借"物品栏"那条标签的位置。
-        this.titleLabelX = CompanionInventoryMenu.LEFT_PANEL_X + 8;
-        this.titleLabelY = CompanionInventoryMenu.PAD + 6;
-        this.inventoryLabelX = CompanionInventoryMenu.RIGHT_PANEL_X + 8;
-        this.inventoryLabelY = CompanionInventoryMenu.PAD + 6;
     }
 
     @Override
@@ -62,8 +71,12 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
         blit(pose, this.leftPos + CompanionInventoryMenu.RIGHT_PANEL_X, this.topPos + CompanionInventoryMenu.PAD,
                 0, 0, PANEL_W, PANEL_H);
 
-        // 高亮她手里那一格——画在贴图之上（贴图的凹槽是不透明的），物品图标由 super.render
-        // 在这之后画，所以高亮天然衬在图标下面。
+        // 把她那侧的合成家具（凹槽/箭头/结果格）盖成面板灰——那一块改画状态
+        fill(pose, this.leftPos + CompanionInventoryMenu.LEFT_PANEL_X + STATUS_X, this.topPos + CompanionInventoryMenu.PAD,
+                this.leftPos + CompanionInventoryMenu.LEFT_PANEL_X + PANEL_W,
+                this.topPos + CompanionInventoryMenu.PAD + STATUS_H, PANEL_GREY);
+
+        // 高亮她手里那一格（画在贴图之上；物品图标由 super.render 之后画，衬在高亮上）
         int held = menu.heldIndex();
         if (held >= 0 && held < 9) {
             Slot s = menu.slots.get(CompanionInventoryMenu.COMPANION_HOTBAR_FIRST + held);
@@ -80,17 +93,101 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
     /** 两块面板各画一个角色模型：左边是她（实体 id 经扩展开屏数据过来），右边是你。 */
     private void renderModels(PoseStack pose, int mouseX, int mouseY) {
         int y = this.topPos + CompanionInventoryMenu.PAD + 75;
-        if (this.minecraft.level != null) {
-            var her = this.minecraft.level.getEntity(menu.companionEntityId());
-            if (her instanceof LivingEntity living) {
-                InventoryScreen.renderEntityInInventory(
-                        this.leftPos + CompanionInventoryMenu.LEFT_PANEL_X + 51, y, 30, mouseX, mouseY, living);
-            }
+        LivingEntity her = herEntity();
+        if (her != null) {
+            InventoryScreen.renderEntityInInventory(
+                    this.leftPos + CompanionInventoryMenu.LEFT_PANEL_X + 51, y, 30, mouseX, mouseY, her);
         }
         if (this.minecraft.player != null) {
             InventoryScreen.renderEntityInInventory(
                     this.leftPos + CompanionInventoryMenu.RIGHT_PANEL_X + 51, y, 30, mouseX, mouseY,
                     this.minecraft.player);
         }
+    }
+
+    /**
+     * 只画她那一侧的状态区，**不画**原版那两条标题（它们会压在盔甲列上）。
+     * 内容：名字、血量、饥饿、效果（buff）。血/饥饿经数据槽同步；效果直接从她的实体读
+     * （{@code UpdateMobEffect} 对所有客户端都发，不用自己同步）。
+     */
+    @Override
+    protected void renderLabels(PoseStack pose, int mouseX, int mouseY) {
+        int x = this.leftPos + CompanionInventoryMenu.LEFT_PANEL_X + STATUS_X + 6;
+        int y = this.topPos + CompanionInventoryMenu.PAD + 12;
+
+        LivingEntity her = herEntity();
+        String name = her != null ? her.getName().getString() : "同伴";
+        this.font.draw(pose, name, x, y, TEXT);
+        y += 14;
+
+        float hp = menu.health();
+        float maxHp = Math.max(1.0F, menu.maxHealth());
+        drawBar(pose, x, y, "生命", hp / maxHp, barText(hp) + "/" + barText(maxHp), HEALTH_FILL);
+        y += 13;
+        drawBar(pose, x, y, "饥饿", menu.food() / 20.0F, menu.food() + "/20", FOOD_FILL);
+        y += 15;
+
+        this.font.draw(pose, "效果", x, y, TEXT_DIM);
+        y += 11;
+        if (her == null || her.getActiveEffects().isEmpty()) {
+            this.font.draw(pose, "（无）", x + 2, y, TEXT_DIM);
+            return;
+        }
+        int shown = 0;
+        for (MobEffectInstance e : her.getActiveEffects()) {
+            if (shown++ >= 4) {
+                break;
+            }
+            this.font.draw(pose, "· " + effectLine(e), x + 2, y, TEXT);
+            y += 11;
+        }
+    }
+
+    /** 一条效果：名字 + 等级 + 剩余时间。 */
+    private String effectLine(MobEffectInstance e) {
+        String name = e.getEffect().getDisplayName().getString();
+        int amp = e.getAmplifier();
+        String level = switch (amp) {
+            case 0 -> "";
+            case 1 -> " II";
+            case 2 -> " III";
+            case 3 -> " IV";
+            default -> " " + (amp + 1);
+        };
+        String time;
+        if (e.isNoCounter()) {
+            time = "∞";
+        } else {
+            int secs = Math.max(0, e.getDuration() / 20);
+            time = (secs / 60) + ":" + String.format("%02d", secs % 60);
+        }
+        return name + level + "  " + time;
+    }
+
+    /** 一条"标签 + 进度条 + 数值"。 */
+    private void drawBar(PoseStack pose, int x, int y, String label, float ratio, String value, int fillColor) {
+        this.font.draw(pose, label, x, y, TEXT_DIM);
+        int bx = x + this.font.width(label) + 3;
+        int by = y + 3;
+        int bw = 44;
+        fill(pose, bx, by, bx + bw, by + 5, BAR_BG);
+        int fillW = Math.round(bw * Math.max(0.0F, Math.min(1.0F, ratio)));
+        if (fillW > 0) {
+            fill(pose, bx, by, bx + fillW, by + 5, fillColor);
+        }
+        this.font.draw(pose, value, bx + bw + 3, y, TEXT);
+    }
+
+    private static String barText(float v) {
+        return v == Math.round(v) ? String.valueOf(Math.round(v)) : String.format("%.1f", v);
+    }
+
+    /** 她此刻的实体（客户端没加载到就 null，模型与 buff 都跳过）。 */
+    private LivingEntity herEntity() {
+        if (this.minecraft.level == null) {
+            return null;
+        }
+        var e = this.minecraft.level.getEntity(menu.companionEntityId());
+        return e instanceof LivingEntity living ? living : null;
     }
 }
