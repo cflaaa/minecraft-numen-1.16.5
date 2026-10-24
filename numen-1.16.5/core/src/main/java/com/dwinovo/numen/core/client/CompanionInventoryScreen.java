@@ -36,7 +36,13 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
     private static final int PANEL_GREY = 0xFFC6C6C6;
     private static final int TEXT = 0xFF404040;
     private static final int TEXT_DIM = 0xFF707070;
-    private static final int BAR_BG = 0xFF3A3A3A;
+    /** 血量/饥饿画成 20 个小格（一格 = 一点），与原版 HUD 同色，不写数字。 */
+    private static final int CELL_W = 3;
+    private static final int CELL_H = 8;
+    private static final int CELL_GAP = 1;
+    private static final int CELLS = 20;
+    /** 空格子：拿槽位那种中灰，落在面板灰上正好读成"没点亮"。 */
+    private static final int CELL_EMPTY = 0xFF8B8B8B;
     private static final int HEALTH_FILL = 0xFFD23A3A;
     private static final int FOOD_FILL = 0xFFC98A2B;
 
@@ -117,34 +123,50 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
         // ⚠️ renderLabels 的 PoseStack 已经被 translate(leftPos, topPos) 过了
         //（原版 render 里 translatef 在 renderBg 之后、renderLabels 之前），
         // 这里只能用**面板相对**坐标；再加一次 leftPos 会让整块文字跑到右下面板上去。
-        int x = CompanionInventoryMenu.LEFT_PANEL_X + STATUS_X + 6;
-        int y = CompanionInventoryMenu.PAD + 12;
+        int x = CompanionInventoryMenu.LEFT_PANEL_X + STATUS_X;
+        int y = CompanionInventoryMenu.PAD + 2;
 
         LivingEntity her = herEntity();
-        String name = her != null ? her.getName().getString() : "同伴";
-        this.font.draw(pose, name, x, y, TEXT);
-        y += 14;
+        this.font.draw(pose, her != null ? her.getName().getString() : "同伴", x, y, TEXT);
+        y += 10;
 
-        float hp = menu.health();
-        float maxHp = Math.max(1.0F, menu.maxHealth());
-        drawBar(pose, x, y, "生命", hp / maxHp, barText(hp) + "/" + barText(maxHp), HEALTH_FILL);
-        y += 13;
-        drawBar(pose, x, y, "饥饿", menu.food() / 20.0F, menu.food() + "/20", FOOD_FILL);
-        y += 15;
+        // 生命：20 格（每格一点），与原版 HUD 同色的红
+        this.font.draw(pose, "生命", x, y, TEXT_DIM);
+        y += 10;
+        drawCells(pose, x, y, Math.round(menu.health()), HEALTH_FILL);
+        y += CELL_H + 3;
 
+        // 饥饿：同样 20 格，南瓜色
+        this.font.draw(pose, "饥饿", x, y, TEXT_DIM);
+        y += 10;
+        drawCells(pose, x, y, menu.food(), FOOD_FILL);
+        y += CELL_H + 3;
+
+        // 效果（buff）：最多两条 + 省略号（这块地方就这么高）
         this.font.draw(pose, "效果", x, y, TEXT_DIM);
-        y += 11;
+        y += 10;
         if (her == null || her.getActiveEffects().isEmpty()) {
-            this.font.draw(pose, "（无）", x + 2, y, TEXT_DIM);
+            this.font.draw(pose, "无", x, y, TEXT_DIM);
             return;
         }
+        java.util.List<MobEffectInstance> effects = new java.util.ArrayList<>(her.getActiveEffects());
         int shown = 0;
-        for (MobEffectInstance e : her.getActiveEffects()) {
-            if (shown++ >= 4) {
+        for (MobEffectInstance e : effects) {
+            if (shown >= 2) {
+                this.font.draw(pose, "…", x, y, TEXT_DIM);
                 break;
             }
-            this.font.draw(pose, "· " + effectLine(e), x + 2, y, TEXT);
-            y += 11;
+            this.font.draw(pose, effectLine(e), x, y, TEXT);
+            y += 9;
+            shown++;
+        }
+    }
+
+    /** 把一点画成一格：点亮的着色，没点亮的用槽位中灰。一格 = 一点，共 20 格。 */
+    private void drawCells(PoseStack pose, int x, int y, int filled, int color) {
+        for (int i = 0; i < CELLS; i++) {
+            int cx = x + i * (CELL_W + CELL_GAP);
+            fill(pose, cx, y, cx + CELL_W, y + CELL_H, i < filled ? color : CELL_EMPTY);
         }
     }
 
@@ -167,24 +189,6 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
             time = (secs / 60) + ":" + String.format("%02d", secs % 60);
         }
         return name + level + "  " + time;
-    }
-
-    /** 一条"标签 + 进度条 + 数值"。 */
-    private void drawBar(PoseStack pose, int x, int y, String label, float ratio, String value, int fillColor) {
-        this.font.draw(pose, label, x, y, TEXT_DIM);
-        int bx = x + this.font.width(label) + 3;
-        int by = y + 3;
-        int bw = 44;
-        fill(pose, bx, by, bx + bw, by + 5, BAR_BG);
-        int fillW = Math.round(bw * Math.max(0.0F, Math.min(1.0F, ratio)));
-        if (fillW > 0) {
-            fill(pose, bx, by, bx + fillW, by + 5, fillColor);
-        }
-        this.font.draw(pose, value, bx + bw + 3, y, TEXT);
-    }
-
-    private static String barText(float v) {
-        return v == Math.round(v) ? String.valueOf(Math.round(v)) : String.format("%.1f", v);
     }
 
     /** 她此刻的实体（客户端没加载到就 null，模型与 buff 都跳过）。 */
