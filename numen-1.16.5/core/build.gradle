@@ -148,25 +148,53 @@ tasks.withType(net.fabricmc.loom.task.AbstractRemapJarTask).configureEach {
     it.remapperIsolation.set(true)
 }
 
-// 「纯客户端版」（#0027）：同一份类、同一个 mod id，只是 fabric.mod.json 换成
-// environment=client 的那份（core/fabric.mod.client.json）——Fabric Loader 按它过滤，
-// 专用服务器上不会加载这份 jar；客户端装它就够：G 开同伴背包、B 开设置面板、
-// 原版聊天直达外接 agent。服务端继续用主产物。
+
+// 「纯客户端版」（#0027）：同一份类、同一个 mod id，只把 fabric.mod.json 的 environment 改成 client。
 //
-// 为什么不是两套源集：客户端要用的类（容器、协议、引擎层）与服务端交织在同一个类图里，
-// 拆源集只换来"jar 小一点"，代价是两套 loom 配置与四条 include 依赖重讲一遍。
-// 真要拆，等客户端侧长大到值得拆的时候再拆。
-def remapClientSource = tasks.named('remapJar')
-tasks.register('clientOnlyJar', Zip) {
+// ⚠️ 绝不能用 src/main/resources 那份 json 自己拼——Loom 在 remapJar 时会往 json 里补一个
+// "jars" 清单（列出 META-INF/jars 下 5 个嵌套模块）。少了它，Fabric Loader 就不注册嵌套模块，
+// 运行时第一句引用 agent.ScriptEngine 就 NoClassDefFoundError（2026-10-24 真机客户端实测踩到）。
+// 所以这里读 remapJar **成品**里的 json，只翻 environment 一个字段，其余原样（jars/depends/refmap…）。
+tasks.register('clientOnlyJar') {
     group = 'build'
-    description = '纯客户端版：同一构建，fabric.mod.json 标 environment=client。'
-    dependsOn remapClientSource
-    archiveFileName = "${mod_name}-Client-fabric-${minecraft_version}-${version}.jar"
-    destinationDirectory = layout.buildDirectory.dir('libs')
-    from({ zipTree(remapClientSource.get().archiveFile) }) {
-        exclude 'fabric.mod.json'
-    }
-    from(file('fabric.mod.client.json')) {
-        rename { 'fabric.mod.json' }
+    description = '纯客户端版：同一构建，把成品 fabric.mod.json 的 environment 改成 client（保留 jars 清单）。'
+    def outDirProvider = layout.buildDirectory.dir('libs')
+    def outName = "${mod_name}-Client-fabric-${minecraft_version}-${version}.jar"
+    dependsOn tasks.named('remapJar')
+    inputs.file(tasks.named('remapJar').flatMap { it.archiveFile })
+    outputs.file(outDirProvider.map { it.file(outName) })
+    doLast {
+        def src = tasks.named('remapJar').get().archiveFile.get().asFile
+        def dst = new File(outDirProvider.get().asFile, outName)
+        def zin = new java.util.zip.ZipInputStream(new java.io.BufferedInputStream(new java.io.FileInputStream(src)))
+        def zout = new java.util.zip.ZipOutputStream(new java.io.BufferedOutputStream(new java.io.FileOutputStream(dst)))
+        try {
+            byte[] buf = new byte[8192]
+            def entry
+            while ((entry = zin.getNextEntry()) != null) {
+                def bos = new java.io.ByteArrayOutputStream()
+                int n
+                while ((n = zin.read(buf)) > 0) { bos.write(buf, 0, n) }
+                byte[] data = bos.toByteArray()
+                if (entry.name == 'fabric.mod.json') {
+                    def json = new groovy.json.JsonSlurper().parse(data)
+                    json.environment = 'client'
+                    json.description = 'CLIENT build of Numen for Minecraft 1.16.5 - G opens a companion inventory like a chest, ' +
+                            'B opens the settings panel, and anything typed in the vanilla chat reaches the companion agent on ' +
+                            'the server, whose thinking and doings narrate back into the chat. The server must run the Numen ' +
+                            'server mod. Unofficial port of https://github.com/Dwinovo/minecraft-numen'
+                    data = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(json)).getBytes('UTF-8')
+                }
+                def out = new java.util.zip.ZipEntry(entry.name)
+                if (entry.time >= 0) { out.setTime(entry.time) }
+                zout.putNextEntry(out)
+                zout.write(data)
+                zout.closeEntry()
+            }
+        } finally {
+            zout.close()
+            zin.close()
+        }
+        logger.lifecycle("clientOnlyJar -> {}", dst)
     }
 }
