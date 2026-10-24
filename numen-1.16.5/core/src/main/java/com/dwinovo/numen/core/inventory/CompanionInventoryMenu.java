@@ -61,8 +61,12 @@ public class CompanionInventoryMenu extends AbstractContainerMenu {
         for (int col = 0; col < 4; col++) {
             addSlot(new BlockedSlot(filler, col, 8 + (5 + col) * 18, 18 + 4 * 18));
         }
-        // 玩家自己的 3 行 + 快捷栏（照 ChestMenu 五行版）。
-        int i = (5 - 1) * 18;
+        // 玩家自己的 3 行 + 快捷栏。
+        //
+        // ⚠️ 偏移量照原版 {@code ChestMenu} 的字节码：{@code i = (行数 - 4) * 18}（不是 (行数-1)！）。
+        // 五行时 i=18，玩家三行在 121/139/157、快捷栏 179；写成 (5-1)*18=72 会整体下移 54 像素，
+        // 玩家背包会跑到窗口背景外面去（2026-10-24 真机截图实测）。
+        int i = (5 - 4) * 18;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 addSlot(new Slot(playerInv, col + row * 9 + 9, 8 + col * 18, 103 + row * 18 + i));

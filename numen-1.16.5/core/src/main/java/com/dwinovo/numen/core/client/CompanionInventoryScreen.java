@@ -33,10 +33,21 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
         this.renderTooltip(pose, mouseX, mouseY);
     }
 
+    /**
+     * 贴图是<b>两段式</b>的（原版 {@code ChestScreen} 同款）：
+     * <ul>
+     *   <li>容器区：从贴图 (0,0) 取 {@code 行数*18+17} 高；</li>
+     *   <li>玩家区：从贴图 (0,126) 取 96 高，接在容器区正下方。</li>
+     * </ul>
+     * 一次 blit 整个 {@code imageHeight} 会把两段之间那段 18 像素（generic_54 里六行箱与玩家区之间的空隙）
+     * 一起画进来，而且玩家区整体错位——2026-10-24 真机实测踩到。
+     */
     @Override
     protected void renderBg(PoseStack pose, float delta, int mouseX, int mouseY) {
         RenderSystem.color4f(1.0F, 1.0F, 1.0F, 1.0F);
         this.minecraft.getTextureManager().bind(CONTAINER_BACKGROUND);
-        blit(pose, this.leftPos, this.topPos, 0.0F, 0.0F, this.imageWidth, this.imageHeight, 256, 256);
+        int rows = 5;
+        blit(pose, this.leftPos, this.topPos, 0.0F, 0.0F, this.imageWidth, rows * 18 + 17, 256, 256);
+        blit(pose, this.leftPos, this.topPos + rows * 18 + 17, 0.0F, 126.0F, this.imageWidth, 96, 256, 256);
     }
 }
