@@ -27,7 +27,8 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
     private static final int PANEL = 0xFFC6C6C6;
     private static final int SLOT_OUTER = 0xFF373737;
     private static final int SLOT_INNER = 0xFF8B8B8B;
-    private static final int HELD_HIGHLIGHT = 0x66FFFFFF;
+    private static final int HELD_HIGHLIGHT = 0x55FFFFFF;
+    private static final int HELD_EDGE = 0xCCFFFFFF;
     private static final int DIVIDER = 0xFF8B8B8B;
 
     public CompanionInventoryScreen(CompanionInventoryMenu menu, Inventory playerInventory, Component title) {
@@ -55,17 +56,24 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
         // 两半之间的分隔线
         fill(pose, leftPos + 6, topPos + 110, leftPos + imageWidth - 6, topPos + 111, DIVIDER);
 
-        // 先高亮她手里的那一格（凹槽画在下面会盖住边缘，正好留出内圈）
+        // 逐格凹槽
+        for (Slot s : menu.slots) {
+            slotBox(pose, leftPos + s.x, topPos + s.y);
+        }
+
+        // 高亮她手里那一格——必须画在凹槽**之上**：凹槽的内底是不透明填充，
+        // 先画高亮就会被它整个盖住（2026-10-24 首版就是这样，等于没画）。
+        // 物品图标由 super.render 在这之后画，所以高亮天然衬在图标下面。
         int held = menu.heldIndex();
         if (held >= 0 && held < 9) {
             Slot s = menu.slots.get(CompanionInventoryMenu.COMPANION_HOTBAR_FIRST + held);
             fill(pose, leftPos + s.x + 1, topPos + s.y + 1,
                     leftPos + s.x + 17, topPos + s.y + 17, HELD_HIGHLIGHT);
-        }
-
-        // 逐格凹槽
-        for (Slot s : menu.slots) {
-            slotBox(pose, leftPos + s.x, topPos + s.y);
+            // 再描一圈亮边，空着也能一眼看出是主手
+            fill(pose, leftPos + s.x + 1, topPos + s.y + 1, leftPos + s.x + 17, topPos + s.y + 2, HELD_EDGE);
+            fill(pose, leftPos + s.x + 1, topPos + s.y + 16, leftPos + s.x + 17, topPos + s.y + 17, HELD_EDGE);
+            fill(pose, leftPos + s.x + 1, topPos + s.y + 1, leftPos + s.x + 2, topPos + s.y + 17, HELD_EDGE);
+            fill(pose, leftPos + s.x + 16, topPos + s.y + 1, leftPos + s.x + 17, topPos + s.y + 17, HELD_EDGE);
         }
     }
 
