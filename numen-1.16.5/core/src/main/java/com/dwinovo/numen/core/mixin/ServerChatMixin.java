@@ -3,6 +3,7 @@ package com.dwinovo.numen.core.mixin;
 import com.dwinovo.numen.core.agent.CompanionBrain;
 import com.dwinovo.numen.core.entity.Companions;
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import net.minecraft.network.protocol.game.ServerboundChatPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
@@ -24,11 +25,17 @@ import java.util.UUID;
  * 回话又广播回原版聊天栏。于是「打开聊天 → 打字 → 回车」就是完整的对话体验，
  * 不需要任何额外界面。
  *
- * <p>谁听得见：她自己的同伴，和无主的「服务器同伴」（owner == null——正是本仓无人值守的
- * 部署形态）。别人家的同伴不偷听。
+ * <p>谁听得见：<b>世界里所有活着的同伴</b>。原版语义是"她自己的同伴"（owner 匹配），
+ * 但本仓的部署形态是共享的服务器同伴 + 外接大脑，且公开聊天本来就会被她们的假客户端
+ * 收成 {@code server_message}（AMBIENT）旁听——owner 门槛挡不住任何东西，只会让
+ * "主人在聊天栏叫她她却不理"（2026-10-25 实测：她的 owner 因 playerdata 恢复成 TestBOT，
+ * 于是真人说话她收不到急件，只收到迟到的旁听）。所以这里不做归属过滤。
  *
- * <p>收窄：命令（{@code /…}）不进——原版在包处理那层就把命令分流走了，到不了这里，
- * 这里再挡一道是防御；同伴自己的话不回流（FakeConnection 不发包，双保险），免得自说自话。
+ * <p>收窄：命令（{@code /…}）不进；同伴自己的话不回流（FakeConnection 不发包，双保险）。
+ *
+ * <p><b>为什么挂 {@code handleChat(ServerboundChatPacket)}（公开的包处理方法）而不是私有的
+ * {@code handleChat(String)}</b>：2026-10-25 实测后者没被调到——普通聊天在原版里走的是
+ * 过滤/异步分支，不一定经那个私有重载。挂包处理方法则一定会经过，且能直接读 {@code getMessage()}。
  */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class ServerChatMixin {
@@ -36,8 +43,9 @@ public abstract class ServerChatMixin {
     @Shadow
     public ServerPlayer player;
 
-    @Inject(method = "handleChat(Ljava/lang/String;)V", at = @At("HEAD"))
-    private void numen$companionsHear(String message, CallbackInfo ci) {
+    @Inject(method = "handleChat(Lnet/minecraft/network/protocol/game/ServerboundChatPacket;)V", at = @At("HEAD"))
+    private void numen$companionsHear(ServerboundChatPacket packet, CallbackInfo ci) {
+        String message = packet == null ? null : packet.getMessage();
         if (message == null || message.isBlank() || message.startsWith("/")) {
             return;
         }
@@ -48,12 +56,7 @@ public abstract class ServerChatMixin {
         if (server == null) {
             return;
         }
-        UUID speaker = this.player.getUUID();
         for (NumenPlayer companion : Companions.all(server)) {
-            UUID owner = companion.getOwnerUuid();
-            if (owner != null && !owner.equals(speaker)) {
-                continue;   // 别人的同伴不偷听
-            }
             CompanionBrain brain = Companions.brain(companion);
             if (brain != null) {
                 brain.tell(message);
