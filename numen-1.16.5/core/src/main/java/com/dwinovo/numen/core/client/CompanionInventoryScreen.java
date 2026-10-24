@@ -35,6 +35,7 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
         this.imageWidth = CompanionInventoryMenu.WIDTH;
         this.imageHeight = CompanionInventoryMenu.HEIGHT;
         this.titleLabelY = 6;
+        this.inventoryLabelX = CompanionInventoryMenu.PLAYER_X;   // 「物品栏」与她/他的格子左缘对齐
         this.inventoryLabelY = 108;
     }
 

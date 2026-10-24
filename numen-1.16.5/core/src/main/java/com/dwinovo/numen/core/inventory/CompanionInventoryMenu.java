@@ -46,11 +46,15 @@ import net.minecraft.world.item.ItemStack;
 public class CompanionInventoryMenu extends AbstractContainerMenu {
 
     // ---- 坐标（相对面板左上角）----
-    private static final int TOP = 18;            // 她那一区第一行的 y
-    private static final int ARMOR_X = 8;         // 盔甲列 / 副手
-    private static final int MAIN_X = 26;         // 她的主背包 / 快捷栏（给左边那列盔甲让出位置）
-    private static final int PLAYER_X = 8;        // 玩家自己的
-    private static final int PLAYER_TOP = 118;
+    //
+    // 面板宽必须容得下「左盔甲列 + 主背包 9 列」：{@code MAIN_X + 9*18 <= WIDTH}。
+    // 2026-10-24 踩过：MAIN_X=26 配 WIDTH=176 时 26+162=188>176，主背包整排画到面板外。
+    // 这条不变式由 {@code CompanionInventoryLayoutTest} 守着，改坐标忘了改宽度就 build 红。
+    public static final int TOP = 18;             // 她那一区第一行的 y
+    public static final int ARMOR_X = 8;          // 盔甲列 / 副手
+    public static final int MAIN_X = 30;          // 她的主背包 / 快捷栏（给左边那列盔甲让出位置）
+    public static final int PLAYER_X = 19;        // 玩家自己的（在面板里居中）
+    public static final int PLAYER_TOP = 118;
 
     /** 她那一侧的格数：盔甲4 + 副手1 + 主背包27 + 快捷栏9 = 41（与玩家背包一致）。 */
     public static final int COMPANION_SLOTS = 41;
@@ -58,8 +62,8 @@ public class CompanionInventoryMenu extends AbstractContainerMenu {
     /** 她快捷栏在 {@link #slots} 里的起始下标（盔甲4 + 副手1 + 主背包27）——屏幕高亮主手要用。 */
     public static final int COMPANION_HOTBAR_FIRST = 4 + 1 + 27;
 
-    /** 面板尺寸（屏幕据此画背景）。 */
-    public static final int WIDTH = 176;
+    /** 面板尺寸（屏幕据此画背景）。宽 = 左内边距8 + 盔甲18 + 间隔4 + 主背包162 + 右内边距8。 */
+    public static final int WIDTH = 200;
     public static final int HEIGHT = PLAYER_TOP + 4 * 18 + 8;
 
     /** 服务端：她的身体；客户端：null。 */
