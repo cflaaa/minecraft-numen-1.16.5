@@ -6,36 +6,69 @@ import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.DataSlot;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * 同伴的背包——原版容器风格（G 键打开，#0027）。
+ * 同伴的背包——<b>玩家自己背包的同款排布</b>（G 键打开，#0027）。
  *
- * <p>上面 5×9 是<b>她的</b>：三行主背包 + 快捷栏一行 + 盔甲四件/副手一行（末尾 4 格是占位，
- * 画出来齐整、不可放不可取）；下面 36 格是玩家自己的。玩家可以往里放东西、也可以直接拿出来——
- * 服务端这半的槽挂在<b>她真格的 {@code PlayerInventory}</b> 上，所以放进去的东西她真的会背着、
- * 会用（auto_eat 挑食、equip 穿戴都从同一个背包读）；反过来她在外头捡的东西，开着界面也看得见
- * 进来——原版的槽同步每刻都在对账。
+ * <pre>
+ *   Alice 的背包            ← 标题
+ *   [盔]  [ 主背包 3×9 ]    ← 盔甲一列在左，与主背包同高；副手在她这一区左下
+ *   [盔]
+ *   [盔]  [ 快捷栏 1×9 ]
+ *   [盔]
+ *   [副]
+ *   ─────────────────────   ← 分隔
+ *   物品栏                  ← 玩家自己的
+ *   [ 3×9 ]
+ *   [ 快捷栏 ]
+ * </pre>
+ *
+ * 她的 41 格 = 盔甲 4 + 副手 1 + 主背包 27 + 快捷栏 9——**与一名玩家的背包格数完全一致**
+ * （早先版本把盔甲/副手塞进最后一行、还补了 4 个占位槽，于是"比玩家多 4 格、又看不出哪格是装备"，
+ * 2026-10-24 用户截图指出，见 issues/0027）。
+ *
+ * <h2>为什么自绘背景</h2>
+ * 原版箱子的 {@code generic_54} 贴图把凹槽<em>烤死</em>在固定坐标上，套到这套排布上会对不齐；
+ * 所以背景由 {@link CompanionInventoryScreen} 自绘（面板 + 逐格凹槽），格子放哪儿凹槽就画哪儿。
  *
  * <h2>两侧怎么共用一个类</h2>
- * {@code MenuType} 的工厂只有 {@code (windowId, playerInventory)}（1.16.5 没有带缓冲的工厂），
- * 所以客户端那半拿一个 {@link SimpleContainer} 哑格顶上：真正的格内容、点击、shift 搬运全由
- * 原版容器协议在服务端这半结算，客户端只是照同步画。{@link #body} 只有服务端实例才非空，
- * 也就是 {@link #stillValid} 只在服务端做"她还在吗、还够得着吗"的检查——客户端那半永远 true，
- * 关屏由服务端发关包决定（原版同一套）。
+ * 客户端工厂只有 {@code (windowId, playerInventory)}，所以客户端那半拿一个 {@link SimpleContainer}
+ * 哑格顶上：格内容、点击、shift 搬运全由原版容器协议在服务端结算，客户端只照同步画。
+ * {@link #body} 只有服务端实例非空——{@link #stillValid} 因此只在服务端做"她还在吗"的检查。
  *
- * <h2>坐标</h2> 照抄 {@code ChestMenu} 五行的排法（i = 72）：她的区 y=18 起，玩家区 y=175 起。
+ * <h2>她手里拿着哪一格</h2>
+ * 她的 {@code inventory.selected} 经 {@link DataSlot} 同步到客户端（{@link #heldIndex()}），
+ * 屏幕据此高亮快捷栏里那一格——"看不到手上拿的"这件事就靠它解决。
  */
 public class CompanionInventoryMenu extends AbstractContainerMenu {
 
-    /** 她那一侧显示的格数：5 行 × 9。 */
-    public static final int COMPANION_SLOTS = 45;
+    // ---- 坐标（相对面板左上角）----
+    private static final int TOP = 18;            // 她那一区第一行的 y
+    private static final int ARMOR_X = 8;         // 盔甲列 / 副手
+    private static final int MAIN_X = 26;         // 她的主背包 / 快捷栏（给左边那列盔甲让出位置）
+    private static final int PLAYER_X = 8;        // 玩家自己的
+    private static final int PLAYER_TOP = 118;
 
-    /** 服务端：她的身体（客户端那半为 null）。 */
+    /** 她那一侧的格数：盔甲4 + 副手1 + 主背包27 + 快捷栏9 = 41（与玩家背包一致）。 */
+    public static final int COMPANION_SLOTS = 41;
+
+    /** 她快捷栏在 {@link #slots} 里的起始下标（盔甲4 + 副手1 + 主背包27）——屏幕高亮主手要用。 */
+    public static final int COMPANION_HOTBAR_FIRST = 4 + 1 + 27;
+
+    /** 面板尺寸（屏幕据此画背景）。 */
+    public static final int WIDTH = 176;
+    public static final int HEIGHT = PLAYER_TOP + 4 * 18 + 8;
+
+    /** 服务端：她的身体；客户端：null。 */
     private final NumenPlayer body;
 
-    /** 客户端工厂（{@code MenuType} 用）：哑格顶上，内容由原版槽同步喂。 */
+    /** 客户端侧的"她选中了哪一格"（服务端经数据槽推来）。 */
+    private int heldIndex;
+
+    /** 客户端工厂（{@code MenuType} 用）。 */
     public CompanionInventoryMenu(int windowId, Inventory playerInv) {
         this(windowId, playerInv, new SimpleContainer(41), null);
     }
@@ -45,39 +78,65 @@ public class CompanionInventoryMenu extends AbstractContainerMenu {
         this.body = body;
         checkContainerSize(companion, 41);
         companion.startOpen(playerInv.player);
-        // 她的 5×9。第 0–2 行是主背包（槽 9..35），第 3 行是快捷栏（槽 0..8）——
-        // 与「玩家自己的背包」同款观感：主区在上、快捷栏垫底。
-        for (int row = 0; row < 4; row++) {
-            for (int col = 0; col < 9; col++) {
-                int index = row < 3 ? 9 + row * 9 + col : row * 9 + col;
-                addSlot(new Slot(companion, index, 8 + col * 18, 18 + row * 18));
-            }
+
+        // ---- 她的：盔甲一列在左，副手在其下，主背包 3×9 与快捷栏在右 ----
+        for (int i = 0; i < 4; i++) {
+            addSlot(new Slot(companion, 36 + i, ARMOR_X, TOP + i * 18));          // 盔甲 36-39
         }
-        // 第 5 行：盔甲 4 + 副手 1，余下 4 格占位（画着齐整，不可用）。
-        for (int col = 0; col < 5; col++) {
-            addSlot(new Slot(companion, 36 + col, 8 + col * 18, 18 + 4 * 18));
-        }
-        Container filler = new SimpleContainer(4);
-        for (int col = 0; col < 4; col++) {
-            addSlot(new BlockedSlot(filler, col, 8 + (5 + col) * 18, 18 + 4 * 18));
-        }
-        // 玩家自己的 3 行 + 快捷栏。
-        //
-        // ⚠️ 偏移量照原版 {@code ChestMenu} 的字节码：{@code i = (行数 - 4) * 18}（不是 (行数-1)！）。
-        // 五行时 i=18，玩家三行在 121/139/157、快捷栏 179；写成 (5-1)*18=72 会整体下移 54 像素，
-        // 玩家背包会跑到窗口背景外面去（2026-10-24 真机截图实测）。
-        int i = (5 - 4) * 18;
+        addSlot(new Slot(companion, 40, ARMOR_X, TOP + 4 * 18));                  // 副手 40
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                addSlot(new Slot(playerInv, col + row * 9 + 9, 8 + col * 18, 103 + row * 18 + i));
+                addSlot(new Slot(companion, 9 + row * 9 + col, MAIN_X + col * 18, TOP + row * 18));  // 主背包 9-35
             }
         }
         for (int col = 0; col < 9; col++) {
-            addSlot(new Slot(playerInv, col, 8 + col * 18, 161 + i));
+            addSlot(new Slot(companion, col, MAIN_X + col * 18, TOP + 3 * 18));   // 快捷栏 0-8
+        }
+
+        // ---- 玩家自己的：3×9 + 快捷栏 ----
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                addSlot(new Slot(playerInv, 9 + row * 9 + col, PLAYER_X + col * 18, PLAYER_TOP + row * 18));
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            addSlot(new Slot(playerInv, col, PLAYER_X + col * 18, PLAYER_TOP + 3 * 18));
+        }
+
+        // ---- 同步「她拿着哪一格」：服务端读她的 selected，客户端存进 heldIndex ----
+        if (body != null) {
+            addDataSlot(new DataSlot() {
+                @Override
+                public int get() {
+                    return body.inventory.selected;
+                }
+
+                @Override
+                public void set(int value) {
+                    // 只往下读，不往回写
+                }
+            });
+        } else {
+            addDataSlot(new DataSlot() {
+                @Override
+                public int get() {
+                    return heldIndex;
+                }
+
+                @Override
+                public void set(int value) {
+                    heldIndex = value;
+                }
+            });
         }
     }
 
-    /** shift 搬运：她的 ↔ 玩家的（照 ChestMenu 的写法，占位槽由 mayPlace=false 挡着）。 */
+    /** 她此刻选中的快捷栏格（0-8）。两侧都读得到。 */
+    public int heldIndex() {
+        return body != null ? body.inventory.selected : heldIndex;
+    }
+
+    /** shift 搬运：她的 ↔ 玩家的。 */
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
         Slot slot = slots.get(index);
@@ -110,27 +169,5 @@ public class CompanionInventoryMenu extends AbstractContainerMenu {
     @Override
     public boolean stillValid(Player player) {
         return body == null || (body.isAlive() && player.distanceToSqr(body) <= 16.0 * 16.0);
-    }
-
-    /** 占位槽：画出来齐整，但不可放、不可取、不可点。 */
-    private static final class BlockedSlot extends Slot {
-        BlockedSlot(Container container, int index, int x, int y) {
-            super(container, index, x, y);
-        }
-
-        @Override
-        public boolean mayPlace(ItemStack stack) {
-            return false;
-        }
-
-        @Override
-        public boolean mayPickup(Player player) {
-            return false;
-        }
-
-        @Override
-        public boolean isActive() {
-            return false;
-        }
     }
 }
