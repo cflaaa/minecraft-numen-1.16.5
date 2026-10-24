@@ -60,6 +60,18 @@ class CompanionInventoryLayoutTest {
     }
 
     /**
+     * 装备栏的容器下标是 {@code 39 - row}（界面头/胸/腿/脚 对着 armor[3..0]），不是 {@code 36 + row}。
+     * 写反了的后果是"把头盔放进最上格，实际戴在脚上"——真机上看着就是"没穿上"（2026-10-24 用户指出）。
+     */
+    @Test
+    void armorRowsMapHeadToTheHighestContainerIndex() {
+        assertEquals(39, CompanionInventoryMenu.armorSlotIndex(0), "最上格（头盔）→ 容器 39");
+        assertEquals(38, CompanionInventoryMenu.armorSlotIndex(1), "胸甲 → 38");
+        assertEquals(37, CompanionInventoryMenu.armorSlotIndex(2), "护腿 → 37");
+        assertEquals(36, CompanionInventoryMenu.armorSlotIndex(3), "最下格（靴子）→ 容器 36");
+    }
+
+    /**
      * 快捷栏的 y 是原版那个 <b>142</b>，不是 {@code MAIN_Y + 3*18 = 138}——主背包三行与快捷栏
      * 之间原版留了 4 像素。按 138 算会整行上移 4px，格子和贴图凹槽错开、物品看着不在格心里
      * （2026-10-24 用户截图指出）。这条断言就是为它写的。

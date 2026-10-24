@@ -44,7 +44,9 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
     private static final int HELD_EDGE = 0xCCFFFFFF;
 
     /** 她那一侧被状态区占掉的区域（面板相对坐标）：原合成区那一块。 */
-    private static final int STATUS_X = 86;
+    /** 她那一侧被状态区占掉的区域（面板相对坐标）。⚠️ 必须避开副手槽（x 77..95），
+     *  取 86 会盖掉副手右半边（2026-10-24 截图）。 */
+    private static final int STATUS_X = 97;
     private static final int STATUS_W = PANEL_W - STATUS_X;
     private static final int STATUS_H = 80;
 
@@ -112,8 +114,11 @@ public final class CompanionInventoryScreen extends AbstractContainerScreen<Comp
      */
     @Override
     protected void renderLabels(PoseStack pose, int mouseX, int mouseY) {
-        int x = this.leftPos + CompanionInventoryMenu.LEFT_PANEL_X + STATUS_X + 6;
-        int y = this.topPos + CompanionInventoryMenu.PAD + 12;
+        // ⚠️ renderLabels 的 PoseStack 已经被 translate(leftPos, topPos) 过了
+        //（原版 render 里 translatef 在 renderBg 之后、renderLabels 之前），
+        // 这里只能用**面板相对**坐标；再加一次 leftPos 会让整块文字跑到右下面板上去。
+        int x = CompanionInventoryMenu.LEFT_PANEL_X + STATUS_X + 6;
+        int y = CompanionInventoryMenu.PAD + 12;
 
         LivingEntity her = herEntity();
         String name = her != null ? her.getName().getString() : "同伴";

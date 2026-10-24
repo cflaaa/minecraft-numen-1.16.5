@@ -1,16 +1,21 @@
 package com.dwinovo.numen.core.inventory;
 
 import com.dwinovo.numen.core.entity.NumenPlayer;
+import com.mojang.datafixers.util.Pair;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.Container;
 import net.minecraft.world.SimpleContainer;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.CraftingContainer;
 import net.minecraft.world.inventory.DataSlot;
+import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.inventory.ResultContainer;
 import net.minecraft.world.inventory.ResultSlot;
 import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.CraftingRecipe;
 import net.minecraft.world.item.crafting.RecipeType;
@@ -83,6 +88,14 @@ public class CompanionInventoryMenu extends AbstractContainerMenu {
     public static final int RESULT_X = 154;
     public static final int RESULT_Y = 28;
 
+    /** 界面从上到下的四件甲：头、胸、腿、脚。 */
+    private static final EquipmentSlot[] ARMOR_TYPES = {
+            EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
+    /** 与上面对应的"空槽幽灵图标"（原版就是这四张）。 */
+    private static final ResourceLocation[] ARMOR_ICONS = {
+            InventoryMenu.EMPTY_ARMOR_SLOT_HELMET, InventoryMenu.EMPTY_ARMOR_SLOT_CHESTPLATE,
+            InventoryMenu.EMPTY_ARMOR_SLOT_LEGGINGS, InventoryMenu.EMPTY_ARMOR_SLOT_BOOTS};
+
     /** 一侧面板里的格数（不含合成）：盔甲4+副手1+主背包27+快捷栏9。 */
     public static final int PANEL_SLOTS = 41;
     /** 玩家那一侧的合成格数：2×2 + 结果。 */
@@ -131,12 +144,16 @@ public class CompanionInventoryMenu extends AbstractContainerMenu {
         addDataSlot(body != null ? read(() -> body.getFoodData().getFoodLevel()) : foodMirror);
     }
 
-    /** 一侧的 41 格：盔甲一列、副手、主背包 3×9、快捷栏（坐标照原版）。 */
+    /** 一侧的 41 格：盔甲一列、副手、主背包 3×9、快捷栏（坐标与下标都照原版）。 */
     private void addPanel(int panelX, Container inv) {
         for (int i = 0; i < 4; i++) {
-            addSlot(new Slot(inv, 36 + i, panelX + ARMOR_X, PAD + ARMOR_Y + i * 18));
+            // ⚠️ 下标是 39 - i，不是 36 + i：容器里 armor[0..3] 的顺序是 脚/腿/胸/头，
+            // 而界面上从上到下是 头/胸/腿/脚。写成 36+i 会把头盔塞进靴子槽——
+            // 真机表现为"放对了位置却没穿上"（2026-10-24 用户截图指出）。
+            addSlot(new ArmorSlot(inv, armorSlotIndex(i), panelX + ARMOR_X, PAD + ARMOR_Y + i * 18,
+                    ARMOR_TYPES[i], ARMOR_ICONS[i]));
         }
-        addSlot(new Slot(inv, 40, panelX + OFFHAND_X, PAD + OFFHAND_Y));
+        addSlot(new OffhandSlot(inv, 40, panelX + OFFHAND_X, PAD + OFFHAND_Y));
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 addSlot(new Slot(inv, 9 + row * 9 + col, panelX + MAIN_X + col * 18, PAD + MAIN_Y + row * 18));
@@ -155,6 +172,56 @@ public class CompanionInventoryMenu extends AbstractContainerMenu {
             }
         }
         addSlot(new ResultSlot(owner, craft, result, 0, panelX + RESULT_X, PAD + RESULT_Y));
+    }
+
+    /** 装备槽：只收对应部位、一格上限、空着时画原版那张幽灵图标。 */
+    private static final class ArmorSlot extends Slot {
+        private final EquipmentSlot type;
+        private final Pair<ResourceLocation, ResourceLocation> icon;
+
+        ArmorSlot(Container container, int index, int x, int y, EquipmentSlot type, ResourceLocation icon) {
+            super(container, index, x, y);
+            this.type = type;
+            this.icon = Pair.of(InventoryMenu.BLOCK_ATLAS, icon);
+        }
+
+        @Override
+        public boolean mayPlace(ItemStack stack) {
+            return stack.getItem() instanceof ArmorItem armor && armor.getSlot() == type;
+        }
+
+        @Override
+        public int getMaxStackSize() {
+            return 1;
+        }
+
+        @Override
+        public Pair<ResourceLocation, ResourceLocation> getNoItemIcon() {
+            return icon;
+        }
+    }
+
+    /** 副手槽：不限制物品（原版也不限制），只是空着时画盾牌图标。 */
+    private static final class OffhandSlot extends Slot {
+        OffhandSlot(Container container, int index, int x, int y) {
+            super(container, index, x, y);
+        }
+
+        @Override
+        public Pair<ResourceLocation, ResourceLocation> getNoItemIcon() {
+            return Pair.of(InventoryMenu.BLOCK_ATLAS, InventoryMenu.EMPTY_ARMOR_SLOT_SHIELD);
+        }
+    }
+
+    /**
+     * 界面第 {@code row} 行（0=头盔、1=胸甲、2=护腿、3=靴子）对应的<b>容器下标</b>。
+     *
+     * <p>原版是 {@code 39 - row}：{@code PlayerInventory} 里 {@code armor[0..3]} 的顺序是
+     * 脚/腿/胸/头，而界面从上到下是头/胸/腿/脚——正好反着。写成 {@code 36 + row} 会把头盔
+     * 塞进靴子槽（真机表现为"放对了位置却没穿上"）。单一事实来源，单测守着。
+     */
+    public static int armorSlotIndex(int row) {
+        return 39 - row;
     }
 
     // ---- 给屏幕读的 ----
