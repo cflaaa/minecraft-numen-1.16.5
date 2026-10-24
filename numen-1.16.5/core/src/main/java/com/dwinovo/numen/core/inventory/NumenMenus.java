@@ -9,13 +9,11 @@ import net.minecraft.world.inventory.MenuType;
  *
  * <p><b>必须在 common init（{@code onInitialize}）里注册，不能懒注册</b>：开容器包过网带的是
  * 注册表的<b>数字 id</b>，两侧按同一顺序注册才对得上号；懒注册（首次使用才触）在服务端与客户端
- * 发生的时机不同，数字 id 就会错位——客户端会弹出完全不相干的界面。Fabric 的
- * {@link ScreenHandlerRegistry#registerSimple} 就是给这条约束用的入口
- * （原版 {@code MenuType} 的构造器是私有的）。
+ * 发生的时机不同，数字 id 就会错位——客户端会弹出完全不相干的界面。
  *
- * <p>两侧各跑一次同一个 {@link #register()}（common init 两边都会跑），工厂只有客户端用：
- * 服务端那半在打开时由 {@code MenuProvider} 直接构造（挂上真格的 PlayerInventory），
- * 客户端那半由工厂拿哑格顶上、内容靠原版槽同步喂。
+ * <p>这一版用 Fabric 的<b>扩展类型</b>（{@link ScreenHandlerRegistry#registerExtended}）：
+ * 开屏时服务端额外塞一段数据（她的实体 id），客户端工厂读它——屏幕据此画她的角色模型。
+ * 原版 {@code MenuType} 的工厂只有 {@code (windowId, playerInventory)}，塞不下这段。
  */
 public final class NumenMenus {
 
@@ -25,8 +23,8 @@ public final class NumenMenus {
     private NumenMenus() {}
 
     public static void register() {
-        COMPANION_INVENTORY = ScreenHandlerRegistry.registerSimple(
+        COMPANION_INVENTORY = ScreenHandlerRegistry.registerExtended(
                 new ResourceLocation("numen", "companion_inventory"),
-                CompanionInventoryMenu::new);
+                (syncId, playerInv, buf) -> new CompanionInventoryMenu(syncId, playerInv, buf.readVarInt()));
     }
 }

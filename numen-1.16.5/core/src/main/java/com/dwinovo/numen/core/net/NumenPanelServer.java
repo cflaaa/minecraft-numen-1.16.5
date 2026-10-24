@@ -10,6 +10,7 @@ import com.dwinovo.numen.core.inventory.CompanionInventoryMenu;
 import com.dwinovo.numen.core.llm.ModelCatalog;
 import com.dwinovo.numen.core.llm.ModelCatalogState;
 import com.dwinovo.numen.core.mcp.McpMode;
+import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import com.google.gson.JsonObject;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -17,7 +18,6 @@ import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.chat.TextComponent;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.SimpleMenuProvider;
 
 /**
  * G 面板的服务端一侧：收客户端的请求，在服务端主线程上执行，再把新快照回过去。
@@ -248,9 +248,25 @@ public final class NumenPanelServer {
             return "附近没有同伴（16 格内）";
         }
         final NumenPlayer companion = body;   // 交给 λ 要 effectively final
-        player.openMenu(new SimpleMenuProvider(
-                (id, inv, p) -> new CompanionInventoryMenu(id, inv, companion.inventory, companion),
-                new TextComponent(companion.getName().getString() + " 的背包")));
+        // 扩展开屏：除了菜单本体，还塞进她的实体 id——客户端拿它画角色模型。
+        player.openMenu(new ExtendedScreenHandlerFactory() {
+            @Override
+            public void writeScreenOpeningData(ServerPlayer opener, net.minecraft.network.FriendlyByteBuf buf) {
+                buf.writeVarInt(companion.getId());
+            }
+
+            @Override
+            public net.minecraft.network.chat.Component getDisplayName() {
+                return new TextComponent(companion.getName().getString() + " 的背包");
+            }
+
+            @Override
+            public net.minecraft.world.inventory.AbstractContainerMenu createMenu(
+                    int id, net.minecraft.world.entity.player.Inventory inv,
+                    net.minecraft.world.entity.player.Player opener) {
+                return new CompanionInventoryMenu(id, inv, companion.inventory, companion, companion.getId());
+            }
+        });
         return null;
     }
 
