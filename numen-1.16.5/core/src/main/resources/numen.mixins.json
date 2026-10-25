@@ -24,7 +24,8 @@
         "SlotAccessor"
     ],
     "client": [
-        "client.NumenOfflineMultiplayerMixin"
+        "client.NumenOfflineMultiplayerMixin",
+        "client.ScreenMcpMixin"
     ],
     "injectors": {
         "defaultRequire": 1

@@ -4,7 +4,9 @@ import com.dwinovo.numen.core.net.NumenPanelNet;
 import com.google.gson.JsonObject;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+import net.minecraft.client.Minecraft;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.chat.TextComponent;
 
 /**
  * 面板在客户端这一侧：一份服务端推来的快照，加上发请求的唯一出口。
@@ -16,6 +18,8 @@ public final class NumenPanelState {
 
     private static volatile JsonObject snapshot = NumenPanelNet.obj();
     private static volatile long updatedAt;
+    /** 玩家刚发了 <mcp>：下一份快照里的自检块要接住（进了剪贴板再清掉）。 */
+    private static volatile boolean awaitingMcpSetup;
 
     private NumenPanelState() {}
 
@@ -28,6 +32,67 @@ public final class NumenPanelState {
         }
         snapshot = parsed;
         updatedAt = System.currentTimeMillis();
+        if (awaitingMcpSetup) {
+            awaitingMcpSetup = false;
+            showMcpSetup(parsed);
+        }
+    }
+
+    /** 聊天栏 <mcp>：请服务端自检。结果回显在 showMcpSetup。 */
+    public static void requestMcpSetup() {
+        awaitingMcpSetup = true;
+        send(NumenPanelNet.OP_MCP_SETUP, null, null);
+    }
+
+    /**
+     * 自检结果进两条路：接入提示词（含令牌）**只进剪贴板**（上游同款决定——不上屏、不进聊天日志），
+     * 屏幕上只留自检结论与一行命令。发不出去（服务端没装 numen/没权限）就直说。
+     */
+    private static void showMcpSetup(JsonObject snap) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null || mc.player == null) {
+            return;
+        }
+        JsonObject setup = NumenPanelNet.object(snap, NumenPanelNet.KEY_MCP_SETUP);
+        if (setup == null) {
+            String note = NumenPanelNet.str(snap, NumenPanelNet.KEY_NOTE, "服务端没有回应自检数据");
+            mc.player.displayClientMessage(
+                    new TextComponent("§c[numen] MCP 自检失败：" + note), false);
+            return;
+        }
+        boolean enabled = NumenPanelNet.integer(setup, "enabled", 0) != 0;
+        boolean bound = NumenPanelNet.integer(setup, "bound", 0) != 0;
+        String endpoint = NumenPanelNet.str(setup, "endpoint", "?");
+        String lan = NumenPanelNet.str(setup, "lan", "");
+        int port = NumenPanelNet.integer(setup, "port", 0);
+        int companions = NumenPanelNet.integer(setup, "companions", 0);
+        if (enabled && bound) {
+            mc.player.displayClientMessage(
+                    new TextComponent("§a[numen] MCP 自检通过：端点 " + endpoint), false);
+        } else if (!enabled) {
+            mc.player.displayClientMessage(new TextComponent(
+                    "§c[numen] 外接大脑没开：把 config/numen/mcp_server.json 的 enabled 改 true 后重启"), false);
+        } else {
+            mc.player.displayClientMessage(new TextComponent(
+                    "§c[numen] 端口 " + port + " 没在监听：看 latest.log 里 [numen-mcp] 的报错"), false);
+        }
+        mc.player.displayClientMessage(
+                new TextComponent("§7同伴 " + companions + " 只" + (lan.isEmpty() ? "" : "，本机地址 " + lan)),
+                false);
+        String prompt = NumenPanelNet.str(setup, "prompt", "");
+        if (!prompt.isEmpty()) {
+            mc.keyboardHandler.setClipboard(prompt);
+            mc.player.displayClientMessage(new TextComponent(
+                    "§a[numen] 接入提示词已复制到剪贴板——Ctrl+V 直接发给你的 AI（含令牌，只发你信任的）"),
+                    false);
+        }
+        String oneliner = NumenPanelNet.str(setup, "oneliner", "");
+        if (!oneliner.isEmpty()) {
+            // 含令牌，所以只在本地聊天里显示（不上服务器广播），用户自己注意别外传
+            mc.player.displayClientMessage(new TextComponent("§f" + oneliner), false);
+            mc.player.displayClientMessage(
+                    new TextComponent("§7（上面这行含令牌，pi 一行接入用；粘贴前别截图外发）"), false);
+        }
     }
 
     public static JsonObject snapshot() {

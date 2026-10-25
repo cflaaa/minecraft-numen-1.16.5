@@ -52,6 +52,8 @@ public final class NumenPanelNet {
     public static final String OP_OPEN_INV = "open_inventory";
     public static final String OP_CONFIG = "config";
     public static final String OP_MCP = "mcp";
+    /** 聊天栏发 <mcp>：请服务端做外接大脑自检，并把接入提示词回过来。 */
+    public static final String OP_MCP_SETUP = "mcp_setup";
     public static final String OP_MODELS = "models";
 
     // ---- 服务端 → 客户端 ----
@@ -64,6 +66,8 @@ public final class NumenPanelNet {
     public static final String KEY_MCP = "mcp";
     /** 「获取模型」的结果。形状：{@code {"pending":bool,"error":str,"list":[str,...]}}。 */
     public static final String KEY_MODELS = "models";
+    /** 自检结果块（McpSetup.build 的形状）。 */
+    public static final String KEY_MCP_SETUP = "mcp_setup";
 
     private static final JsonParser PARSER = new JsonParser();
 
@@ -127,6 +131,11 @@ public final class NumenPanelNet {
      * @param ok   上面那句话是成功还是失败
      */
     public static JsonObject snapshot(MinecraftServer server, String note, boolean ok) {
+        return snapshot(server, note, ok, null);
+    }
+
+    /** 同上，再往快照里附加一块（比如 <mcp> 自检的结果）；{@code extra} 可为 null。 */
+    public static JsonObject snapshot(MinecraftServer server, String note, boolean ok, JsonObject extra) {
         JsonObject root = obj();
         root.addProperty(KEY_PROTOCOL, PROTOCOL);
         root.addProperty(KEY_OK, ok);
@@ -137,6 +146,9 @@ public final class NumenPanelNet {
         root.add(KEY_CONFIG, config());
         root.add(KEY_MCP, mcp());
         root.add(KEY_MODELS, com.dwinovo.numen.core.llm.ModelCatalogState.snapshot());
+        if (extra != null) {
+            root.add(KEY_MCP_SETUP, extra);
+        }
         return root;
     }
 

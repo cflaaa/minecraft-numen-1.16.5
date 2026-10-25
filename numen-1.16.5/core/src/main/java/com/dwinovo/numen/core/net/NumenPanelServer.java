@@ -10,6 +10,7 @@ import com.dwinovo.numen.core.inventory.CompanionInventoryMenu;
 import com.dwinovo.numen.core.llm.ModelCatalog;
 import com.dwinovo.numen.core.llm.ModelCatalogState;
 import com.dwinovo.numen.core.mcp.McpMode;
+import com.dwinovo.numen.core.mcp.McpSetup;
 import net.fabricmc.fabric.api.screenhandler.v1.ExtendedScreenHandlerFactory;
 import com.google.gson.JsonObject;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
@@ -112,6 +113,12 @@ public final class NumenPanelServer {
                 boolean on = NumenPanelNet.integer(req, "value", 0) != 0;
                 McpMode.instance().setEnabled(on);
                 note = on ? "外接大脑已开启" : "外接大脑已关闭";
+            }
+            case NumenPanelNet.OP_MCP_SETUP -> {
+                // 聊天栏 <mcp>：服务端自检（外接大脑开没开/端口听没听/该用哪个地址），
+                // 把接入提示词与一行命令一并回给客户端——它只进剪贴板，不上屏广播。
+                reply(player, NumenPanelNet.snapshot(server, "MCP 自检完成", true, McpSetup.build(server)));
+                return;
             }
             case NumenPanelNet.OP_MODELS -> {
                 // 异步：立刻回一份「正在拉」的快照（面板显示「获取中…」），
