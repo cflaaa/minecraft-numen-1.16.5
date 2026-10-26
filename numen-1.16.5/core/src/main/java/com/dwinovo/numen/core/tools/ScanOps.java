@@ -8,12 +8,20 @@ import com.dwinovo.numen.core.sdk.Doc;
 import com.dwinovo.numen.core.sdk.Methods;
 import com.dwinovo.numen.core.sdk.Pending;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BedBlock;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.util.Mth;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.phys.AABB;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.Optional;
 import com.dwinovo.numen.core.scan.BlockSearch;
-import net.minecraft.util.Mth;
 
 /**
  * {@code numen.scan.blocks} 的实现(登记在 {@link com.dwinovo.numen.core.tools.perception.ScanApi})。看是按刻分片的
@@ -74,9 +82,68 @@ public final class ScanOps {
         }
         if (res.columnsUnloaded() > 0) {
             notes.add(res.columnsUnloaded() + " of " + res.columnsTotal() + " chunk columns in this "
-                    + "radius are not loaded, so they were not searched — blocks out there are "
+                    + "radius are not searched — blocks out there are "
                     + "UNKNOWN, not absent; walk that way and scan again to find out");
         }
         return notes.isEmpty() ? null : String.join("; ", notes);
+    }
+
+    /**
+     * 找最近的空闲床头。
+     * <p>同步阻塞扫描 {@code #minecraft:beds}，返回最近的、床头未被占用的 {@code BlockPos}。
+     * 用于 {@link com.dwinovo.numen.core.task.chain.SleepChain} 反射。
+     *
+     * @param self 同伴
+     * @param radius 搜索半径（方块）
+     * @return 最近的空闲床头位置，或 {@code Optional.empty()}
+     */
+    public static Optional<BlockPos> findNearestBed(NumenPlayer self, int radius) {
+        return findNearestBedSync(self, radius);
+    }
+
+    /**
+     * 同步找最近的空闲床头（反射专用，不走异步 Pending）。
+     */
+    private static Optional<BlockPos> findNearestBedSync(NumenPlayer self, int radius) {
+        Level level = self.level();
+        BlockPos center = self.blockPosition();
+        int r = Mth.clamp(radius, MIN_RADIUS, BlockScan.MAX_RADIUS);
+        
+        // 从近到远遍历（按曼哈顿距离分层），找第一张空闲床
+        for (int d = 0; d <= r; d++) {
+            for (int dx = -d; dx <= d; dx++) {
+                for (int dz = -d; dz <= d; dz++) {
+                    // 只检查当前层的边界（曼哈顿距离 = d 的格子）
+                    if (Math.abs(dx) + Math.abs(dz) != d) continue;
+                    
+                    for (int dy = -2; dy <= 2; dy++) { // 床通常在同一高度或上下 1-2 格
+                        BlockPos pos = center.offset(dx, dy, dz);
+                        BlockState state = level.getBlockState(pos);
+                        if (state.getBlock() instanceof BedBlock) {
+                            // 确认是床头
+                            if (state.hasProperty(BedBlock.PART) 
+                                    && state.getValue(BedBlock.PART) == BedPart.HEAD) {
+                                // 检查是否被占用：同一位置是否有实体在睡觉
+                                if (!isBedOccupied(level, pos)) {
+                                    return Optional.of(pos);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * 检查床头位置是否被实体占用（有玩家/同伴正在睡这张床）。
+     */
+    private static boolean isBedOccupied(Level level, BlockPos bedHead) {
+        // 遍历附近实体，看有没有 isSleeping() 且 sleepingPos == bedHead
+        var entities = level.getEntitiesOfClass(LivingEntity.class,
+                new AABB(bedHead).inflate(2.0),
+                e -> e.isSleeping() && e.getSleepingPos().equals(bedHead));
+        return !entities.isEmpty();
     }
 }

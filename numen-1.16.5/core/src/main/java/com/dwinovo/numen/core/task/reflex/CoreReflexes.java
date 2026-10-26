@@ -13,9 +13,10 @@ import com.dwinovo.numen.core.task.chain.UnstuckChain;
  * are roster representatives only (id/describe are constants); the live,
  * per-companion chain instances stay inside each {@code CompanionBrain}.
  *
- * <p>上游五条(MLG/换气/逃跑/自卫/脱困)之外,本仓加回一条 {@code EatChain}(自动进食,#0021):
- * 上游删了它("饿是主人该知道的事"),但无人值守的部署形态没有主人盯着喂——
- * 饿到自己处理,免得急件一遍遍打断在跑的程序。
+ * <p>上游五条(MLG/换气/逃跑/自卫/脱困)之外,本仓加回:
+ * {@code EatChain}(自动进食,#0021)、{@code SleepChain}(晚上自动睡觉)。
+ * 上游删了 EatChain("饿是主人该知道的事")，但无人值守的部署形态没有主人盯着喂——
+ * 饿到/困到自己处理,免得急件一遍遍打断在跑的程序。
  */
 public final class CoreReflexes {
 
@@ -29,5 +30,6 @@ public final class CoreReflexes {
         ReflexRegistry.register(new UnstuckChain());
         ReflexRegistry.register(new com.dwinovo.numen.core.task.chain.EatChain());
         ReflexRegistry.register(new com.dwinovo.numen.core.task.chain.ForageChain());
+        ReflexRegistry.register(new com.dwinovo.numen.core.task.chain.SleepChain());
     }
 }
