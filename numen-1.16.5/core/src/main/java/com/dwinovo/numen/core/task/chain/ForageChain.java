@@ -34,11 +34,13 @@ import java.util.List;
  * 用户定的第二方案(#0025)**加回一条低优先本能**:没吃的就自己去打猎，把"找吃的"这件事从
  * "打断外脑"改成"身体自己办"。
  *
- * <h2>三拍子</h2>
+ * <h2>三拍子（状态机见 {@link ForageDecisions}，2026-10-30 重做）</h2>
  * <pre>
+ * IDLE: 空闲。初始与每轮收场都在这里;再出发必须过完整闸门(ForageDecisions.next),
+ *       过了才真的开猎——饱食的同伴绝不主动狩猎,也不再有"选中了却空转"的 tick。
  * HUNT: 派一场 AttackCompanionTask 打最近的一只猎物(点名模式,与 numen.fight.attack 同一份代码)
- * LOOT: 用按键直接走到掉落物旁——原版玩家走近就捡(ItemEntityTouchMixin → NumenPlayer.touchedItem)
- * DONE: 收场,下一刻 EatChain(注册号 35,在本条 36 之前)拿到有吃的的身体,自己去吃
+ * LOOT: 用按键直接走到掉落物旁——原版玩家走近就捡(ItemEntityTouchMixin → NumenPlayer.touchedItem);
+ *       捡完/捡不到回 IDLE,下一轮再饿时由闸门重新放行。
  * </pre>
  *
  * <h2>什么时候不抢身体</h2>
@@ -68,9 +70,7 @@ public final class ForageChain implements Task, Reflex {
     /** 离掉落物这么近就停(原版拾取要 bounding box 相交)。 */
     private static final double LOOT_REACH = 0.6;
 
-    private enum Phase { HUNT, LOOT, DONE }
-
-    private Phase phase = Phase.HUNT;
+    private ForageDecisions.Phase phase = ForageDecisions.Phase.IDLE;
     private AttackCompanionTask hunt;
     private int lootTicks;
 
@@ -98,48 +98,57 @@ public final class ForageChain implements Task, Reflex {
 
     // ---- 调度 ----
 
+    /** 把 Minecraft 事实收拢成状态机的门槛快照。 */
+    private ForageDecisions.Gates gates(NumenPlayer companion, boolean preyNear) {
+        return new ForageDecisions.Gates(
+                WorkProfile.of(companion).hasHunger()
+                        && companion.getFoodData().getFoodLevel() <= FORAGE_AT,
+                EatChain.pickFood(companion) == null,
+                preyNear,
+                !Menace.hostilesAround(companion, DANGER_RADIUS).isEmpty(),
+                companion.reflexPaused(ID),
+                companion.reflexPaused(MobDefenseChain.ID));
+    }
+
     @Override
     public boolean canRun(NumenPlayer companion) {
-        if (phase != Phase.DONE) {
-            return true;   // 打猎/捡东西中:做完再说
-        }
-        if (companion.reflexPaused(ID)) {
-            return false;   // 模型派的活占着(同一 ID 的本能闸门)
-        }
-        if (companion.reflexPaused(MobDefenseChain.ID)) {
-            return false;   // 模型派的架正在打:打架不猎
-        }
-        // 身边已经有危险:让 MobDefense/Flee 先处理,别把它拉去追猪
-        if (!Menace.hostilesAround(companion, DANGER_RADIUS).isEmpty()) {
-            return false;
-        }
-        return canForage(companion);
+        // HUNT/LOOT:做完再说(抢断由更高优先级链按序完成);IDLE:过完整闸门,过不了不占调度器。
+        boolean preyNear = nearestPrey(companion) != null;
+        return ForageDecisions.next(phase, gates(companion, preyNear))
+                != ForageDecisions.Action.REST;
     }
 
     @Override
     public TaskState tick(NumenPlayer companion) {
-        switch (phase) {
-            case HUNT -> tickHunt(companion);
-            case LOOT -> tickLoot(companion);
-            default -> { /* DONE:canRun 已经把它挡回去了 */ }
+        boolean preyNear = nearestPrey(companion) != null;
+        switch (ForageDecisions.next(phase, gates(companion, preyNear))) {
+            case START_HUNT -> startHunt(companion, preyNear);
+            case CONTINUE_HUNT -> tickHunt(companion);
+            case CONTINUE_LOOT -> tickLoot(companion);
+            case REST -> { /* 闸门没过:不该被调度;万一被调度,交回身体不做任何事 */ }
         }
-        return TaskState.RUNNING;   // 这条链没有终点:吃完/捡完下一刻 canRun 说了算
+        return TaskState.RUNNING;   // 这条链没有终点:收场回 IDLE,下一刻闸门说了算
+    }
+
+    /** IDLE 且闸门全过:真的发起攻击——构造狩猎任务并 start。 */
+    private void startHunt(NumenPlayer companion, boolean preyNear) {
+        Mob prey = nearestPrey(companion);
+        if (prey == null) {
+            return;   // canRun 与此刻之间猎物消失:留在 IDLE,下轮闸门重新判
+        }
+        long now = companion.level().getGameTime();
+        AttackTaskRecord record = new AttackTaskRecord(
+                ID, "forage-" + now, now + HUNT_DEADLINE_TICKS, List.of(prey.getId()), false);
+        hunt = new AttackCompanionTask(companion, record);
+        hunt.start(companion);
+        phase = ForageDecisions.Phase.HUNT;
+        Constants.LOG.info("[numen-forage] 自动打猎 —— 目标 {} 约 {} 格外",
+                prey.getType().getDescriptionId(), Math.round(companion.distanceTo(prey)));
     }
 
     private void tickHunt(NumenPlayer companion) {
         if (hunt == null) {
-            Mob prey = nearestPrey(companion);
-            if (prey == null) {
-                phase = Phase.DONE;   // 猎物没了:收场
-                return;
-            }
-            long now = companion.level().getGameTime();
-            AttackTaskRecord record = new AttackTaskRecord(
-                    ID, "forage-" + now, now + HUNT_DEADLINE_TICKS, List.of(prey.getId()), false);
-            hunt = new AttackCompanionTask(companion, record);
-            hunt.start(companion);
-            Constants.LOG.info("[numen-forage] 自动打猎 —— 目标 {} 约 {} 格外",
-                    prey.getType().getDescriptionId(), Math.round(companion.distanceTo(prey)));
+            phase = ForageDecisions.Phase.IDLE;   // 状态错位(被抢占清了任务):回 IDLE 重走闸门
             return;
         }
         TaskState state = hunt.tick(companion);
@@ -148,7 +157,7 @@ public final class ForageChain implements Task, Reflex {
             hunt = null;
             companion.controls().releaseAll();
             Constants.LOG.info("[numen-forage] 猎毕 {} —— {}", state, line);
-            phase = Phase.LOOT;   // 去把它掉的捡起来
+            phase = ForageDecisions.Phase.LOOT;   // 去把它掉的捡起来
             lootTicks = LOOT_MAX_TICKS;
         }
     }
@@ -176,7 +185,7 @@ public final class ForageChain implements Task, Reflex {
 
     private void finish(NumenPlayer companion, String why) {
         companion.controls().releaseAll();
-        phase = Phase.DONE;
+        phase = ForageDecisions.Phase.IDLE;
         lootTicks = 0;
         Constants.LOG.info("[numen-forage] 收场 —— {}", why);
         NumenEvents.reflex(companion, this, "went and got food on instinct — " + why);
