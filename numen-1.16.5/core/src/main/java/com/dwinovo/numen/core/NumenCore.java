@@ -67,7 +67,8 @@ public final class NumenCore {
     }
 
     /** 把 core 的五条生存本能链插进引擎的竞价调度(链登记口)。 */
-    private static void registerReflexes() {
+    // 包私有:排序有单测守着(ReflexOrderTest,NumenCore 注释里引用的那份,移植时一直缺席——现补)。
+    static void registerReflexes() {
         // 注册号小的先问 —— 与原版 addGoal(int priority, goal) 同一惯例:摔落缓冲 > 换气 > 逃跑 > 自卫 > 自动进食 > 脱困。
         // 逃跑压过自卫:扛不住时先跑,跑不掉它让出身体,自卫接着打。
         // 自动进食排在自卫之后、脱困之前:打着架不吃(仗没打完它拿不到身体);饿到扣血时它
@@ -93,6 +94,11 @@ public final class NumenCore {
                 com.dwinovo.numen.core.task.chain.ForageChain::new);
         com.dwinovo.numen.core.task.BrainChains.register(50,
                 com.dwinovo.numen.core.task.chain.UnstuckChain::new);
+        // 晚上自动找床睡觉(2026-10-30 工单):舒适级反射,排在一-human 合成链之后——
+        // 绝不该为睡觉打断打架/觅食/脱困;但要在 LLM 之前——无人值守时她困了自己处理,
+        // 免得整夜站桩。维度闸门在链内(下界/末地床会炸,bedWorks=false 不碰)。
+        com.dwinovo.numen.core.task.BrainChains.register(60,
+                com.dwinovo.numen.core.task.chain.SleepChain::new);
     }
 
     /**

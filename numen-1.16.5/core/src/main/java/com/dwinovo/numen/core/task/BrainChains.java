@@ -41,4 +41,9 @@ public final class BrainChains {
     public static synchronized int size() {
         return ENTRIES.size();
     }
+
+    /** 已注册链的 order 列表(按注册序)。排序守卫 {@code ReflexOrderTest} 用;不影响运行时。 */
+    public static synchronized List<Integer> registeredOrders() {
+        return ENTRIES.stream().map(Entry::order).toList();
+    }
 }
